@@ -11,6 +11,8 @@
 #include "Arduino.h"
 //add your includes for the project Timer here
 
+#include "Time.h"
+
 //end of add your includes here
 #ifdef __cplusplus
 extern "C" {
@@ -21,11 +23,12 @@ private:
   time_t alarm;
   int    alarm_ms;
   
+public:
   // Constructor to set an alarm in a given number of ms from current time
   Timer(long ms);
   
   // Construct an alarm for a specified time
-  Timer(time_t t);
+  // Timer(time_t t);
 
   char* toString() const;
   

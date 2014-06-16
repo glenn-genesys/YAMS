@@ -39,9 +39,10 @@ While running, record history of temperatures, min and max per hour
 #include <Wire.h>
 #include <LiquidCrystal.h>   // include LCD library
 #include <Time.h>
-#include <TimeAlarms.h>
-#include <YAMS.h>
-#include <AnalogButtons.h>
+
+#include "Timer.h"
+#include "YAMS.h"
+#include "AnalogButtons.h"
 /*--------------------------------------------------------------------------------------
   Defines
 --------------------------------------------------------------------------------------*/
@@ -110,9 +111,9 @@ MenuValue runHours     = MenuValue("Hours", 0);
 
 Menu runningTime       = Menu("Get/Set Runtime", false).addChild( runDays ).addChild( runHours );
 
-MenuArray schedule     = MenuArray("Schedule", schedule);
+MenuArray scheduleMenu = MenuArray("Schedule", schedule);
 
-Menu mm = Menu("Main Menu", false).addChild( runningTime ).addChild( schedule );
+Menu mm = Menu("Main Menu", false).addChild( runningTime ).addChild( scheduleMenu );
 
 /*    MenuItem review         = MenuItem(menu, "Review", 2);
       MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
@@ -123,6 +124,9 @@ Menu mm = Menu("Main Menu", false).addChild( runningTime ).addChild( schedule );
     menu.getRoot().addRight( MenuList({runningTime, schedule, review}) );
 */
 
+// Forward declarations
+void normalDisplay();
+void updateTemp();
 
 /*--------------------------------------------------------------------------------------
   setup()
@@ -169,16 +173,15 @@ void setup(void) {
 
    mm.setLCD(lcd);
    mm.setKeypad(keypad);
-   mm.setTimer(Alarm);
 
    lcd.setCursor(0, 0);
    lcd.print("Heating/Cooling");
    Alarm.delay(2000);
 
-   normalDisplay(smoothedTemp, 20.0);
+   normalDisplay();
 }
 
-
+/*
 class RuntimeMenu : Menu { // : Menu("Get/Set Runtime"), startTime(now()) {
 
 	void display2(void *(print(char *)) pr) {
@@ -190,7 +193,7 @@ class RuntimeMenu : Menu { // : Menu("Get/Set Runtime"), startTime(now()) {
 
 private:
 	long startTime;
-}
+}  */
 
 
 /*--------------------------------------------------------------------------------------
@@ -310,7 +313,7 @@ private:
 */
 void normalDisplay() {
    lcd.setCursor( 0, 0 );   //top left
-   lcd.print(currentTemp, DEC);
+   lcd.print(smoothedTemp, DEC);
    // Overwrite from fourth decimal place
    lcd.setCursor( 0, 6 );  
    lcd.print(" C / ");
@@ -348,8 +351,8 @@ void runningMode(float setPoint) {
     
     if (redrawTime.timeUp()) {
     
-      normalDisplay(temperature, setPoint);
-      redrawTime.extend(REFRESH_PERIOD);
+      normalDisplay();
+      redrawTime.extend(REDRAW_PERIOD);
       
       // Apply temperature control logic
       if (!recentlySwitched) {
@@ -361,8 +364,8 @@ void runningMode(float setPoint) {
           Alarm.timerOnce(RESWITCH_TIME, unlockAppliance);      // Allow switching again after reswitch period
         }
       }
-    }
-  } while (!keypad.buttonJustPressed);
+    };
+  } while (!keypad.getButtonJustPressed());
 }
 
 /*--------------------------------------------------------------------------------------
@@ -487,10 +490,10 @@ void updateTemp() {
    
    smoothedTemp = smoothedTemp * (1 - AVERAGE_WEIGHT) + temperature * AVERAGE_WEIGHT;
 
-   hourlyMax[runHours] = max(hourlyMax[runHours], smoothedTemp);
-   hourlyMin[runHours] = min(hourlyMin[runHours], smoothedTemp);
-   dailyMax[runDays]   = max(dailyMax[runDays], smoothedTemp);
-   dailyMin[runDays]   = min(dailyMin[runDays], smoothedTemp);
+   hourlyMax[runHours.getValue()] = max(hourlyMax[runHours.getValue()], smoothedTemp);
+   hourlyMin[runHours.getValue()] = min(hourlyMin[runHours.getValue()], smoothedTemp);
+   dailyMax[runDays.getValue()]   = max(dailyMax[runDays.getValue()], smoothedTemp);
+   dailyMin[runDays.getValue()]   = min(dailyMin[runDays.getValue()], smoothedTemp);
 }
 
 void updateRuntime() {

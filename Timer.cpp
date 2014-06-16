@@ -13,10 +13,10 @@ private:
   }
   
   // Construct an alarm for a specified time, according to the given clock
-  Timer::Timer(time_t t) {
+  /* Timer::Timer(time_t t) {
     alarm = t;
     alarm_ms = 0;
-  }
+  } */
 
   char* Timer::toString() const {
 	  if (alarm == -1)   return "Not set";

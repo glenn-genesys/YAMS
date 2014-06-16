@@ -38,6 +38,11 @@
   #include <WProgram.h>
 #endif
 
+#include "TimeAlarms.h"
+#include "AnalogButtons.h"
+
+#define MENU_TIMEOUT 30000
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -61,7 +66,6 @@ protected:
 
 	static LiquidCrystal lcd;
 	static AnalogButtons keypad;
-	static AlarmTimer    timer;
 
 	/* static void serialDisplay(Menu &m);   // Default display method
 	static void lcdDisplay(Menu &m);
@@ -70,9 +74,9 @@ protected:
   	static Menu *keypadProcInput(Menu &m);
 	 */
 
-	static void _display(Menu &m);
-	static char _input(Menu &m);     // Default non-blocking function to get input
-	static Menu *_processInput(Menu &m); // Default input interpreter
+	const static void _display(Menu &m);
+	const static char _input(Menu &m);     // Default non-blocking function to get input
+	const static Menu *_processInput(Menu &m); // Default input interpreter
 
 	static Menu *getif(Menu *t);
 
@@ -102,7 +106,13 @@ public:
 
 	virtual void activate();
 
-	// Menu construction
+	void setLCD( LiquidCrystal l  );
+	void setKeypad( AnalogButtons k );
+
+	static void LCDdisplay(Menu &m);
+	static Menu *keypadProcInput(Menu &m);
+
+		// Menu construction
 	Menu &addChild( Menu &c);
 	Menu &addSibling( Menu &c, bool loop);   // Adds siblings in a loop if loop is true (ignores parent.loop)
 
@@ -111,33 +121,46 @@ public:
 class MenuValue : Menu {
 protected:
 	int &value;
-	bool selected = false;  // When MenuValue is selected, up and down adjust value
+	bool selected;  // When MenuValue is selected, up and down adjust value
 
 public:
 	MenuValue(const char *n,
+			  int v,
+			  const void (*dis)(Menu &m),
+			  const Menu* (*procin)(Menu &m),
+			  const char (*in)(Menu &m));
+/*
+ * 	MenuValue(const char *n,
 			  int &v,
-			  const void (*display)(Menu &m),
-			  const char (*processInput)(Menu &m),
-			  const char (*input)(Menu &m));
+			  const void (*dis)(Menu &m) = _display,
+			  const Menu* (*procin)(Menu &m) = _processInput,
+			  const char (*in)(Menu &m) = _input);
+ *
+ */
+
 
   /* MenuValue(const char *n,
 			  int &v,
          const io   parts);
   */
+
+	int getValue();
+	void setValue(int v);
 };
 
 class MenuArray : Menu {
 protected:
-  int[] values;
-  bool  selected = false;
+  float values[];
+  bool  selected;
+  int index;
   
 public:
   MenuArray(const char *n,
-        int[] vs,
-			  const void (*display)(Menu &m),
-			  const char (*processInput)(Menu &m),
-			  const char (*input)(Menu &m));
-}
+		  float &vs,
+		  const void (*display)(Menu &m),
+		  const char (*processInput)(Menu &m),
+		  const char (*input)(Menu &m));
+};
 
 #ifdef __cplusplus
 } // extern "C"
