@@ -42,31 +42,6 @@
 extern "C" {
 #endif
 
-class withKeypad {
-protected:
-  AnalogButtons keypad;
-  
-public:
-  withKeypad( AnalogButtons k );
-
-  Menu *processInput(); // Keypad input interpreter
-}
-
-class withLCD {
-protected:
-  LiquidCrystal lcd;
-
-public:
-  withLCD( LiquidCrystal lcd );
-
-  void display();
-}
-
-class withSerial {
-  void display();
-  Menu *processInput();  // Serial character input interpreter
-}
-
 class Menu {
 protected:
 	char *name;
@@ -84,9 +59,20 @@ protected:
 	char (*processInput)(Menu &m);  // Function pointer to input interpreter
 	void (*display)(Menu &m); // Function pointer to display method
 
-	void _display(Menu &m);   // Default display method
-	char _input(Menu &m);     // Default non-blocking function to get input
-	Menu *_processInput(Menu &m); // Default input interpreter
+	static LiquidCrystal lcd;
+	static AnalogButtons keypad;
+	static AlarmTimer    timer;
+
+	/* static void serialDisplay(Menu &m);   // Default display method
+	static void lcdDisplay(Menu &m);
+	static char serialInput(Menu &m);     // Default non-blocking function to get input
+	static Menu *serialProcessInput(Menu &m); // Default input interpreter
+  	static Menu *keypadProcInput(Menu &m);
+	 */
+
+	static void _display(Menu &m);
+	static char _input(Menu &m);     // Default non-blocking function to get input
+	static Menu *_processInput(Menu &m); // Default input interpreter
 
 	static Menu *getif(Menu *t);
 
@@ -97,8 +83,15 @@ public:
 		 const Menu (*processInput)(Menu &m),
 		 const char (*input)(Menu &m));
 
-	virtual ~Menu();
+  /* Menu(const char *n,
+       const bool loop,
+       const io   parts);
 
+	enum io;
+   */
+
+	virtual ~Menu();
+	
 	// Standard menu operation functions that may be overridden
 	virtual Menu *left();
 	virtual Menu *right();
@@ -111,7 +104,7 @@ public:
 
 	// Menu construction
 	Menu &addChild( Menu &c);
-	Menu &addSibling( Menu &c, bool loop);   // Adds siblings in a loop if loop is true (ignores parent)
+	Menu &addSibling( Menu &c, bool loop);   // Adds siblings in a loop if loop is true (ignores parent.loop)
 
 };
 
@@ -126,17 +119,25 @@ public:
 			  const void (*display)(Menu &m),
 			  const char (*processInput)(Menu &m),
 			  const char (*input)(Menu &m));
+
+  /* MenuValue(const char *n,
+			  int &v,
+         const io   parts);
+  */
 };
 
-class SerialMenu : Menu : withSerial;
-class LCDMenu : Menu : withLCD;
-class KeypadMenu : Menu : withKeypad;
-class KeypadLCDMenu : LCDMenu : withKeypad;
-
-class SerialMenuValue : MenuValue : withSerial;
-class LCDMenuValue : MenuValue : withLCD;
-class KeypadMenuValue : MenuValue : withKeypad;
-class KeypadLCDMenuValue : LCDMenuValue : withKeypad;
+class MenuArray : Menu {
+protected:
+  int[] values;
+  bool  selected = false;
+  
+public:
+  MenuArray(const char *n,
+        int[] vs,
+			  const void (*display)(Menu &m),
+			  const char (*processInput)(Menu &m),
+			  const char (*input)(Menu &m));
+}
 
 #ifdef __cplusplus
 } // extern "C"

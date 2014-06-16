@@ -5,7 +5,9 @@
  *      Author: glenn burgess
  */
 
-#import "YAMS.h"
+#include <YAMS.h>
+#include <TimeAlarms.h>
+#include <AnalogButtons.h>
 
 /* class Menu {
 private:
@@ -19,7 +21,6 @@ private:
 
 	static menu *last;
 */
-// #define getif(p) {Menu *t = (p); if (t) {last = &this; return t;} else return &this;}
 
 // Default input function is _input(). Default display method is _default()
 void Menu::Menu(const char *n,
@@ -62,7 +63,7 @@ Menu *Menu::down() {
 }
 
 Menu *Menu::select() {
-	return getif(child);    // Select is the same as right, by default
+	return right();    // Select is the same as right, by default
 }
 
 Menu *Menu::back() {
@@ -77,8 +78,27 @@ void Menu::activate() {
 	} while (current);   // NULL from process input means exit menu
 }
 
+void Menu::setLCD( LiquidCrystal l  ) {
+	lcd = l;
+	display = &LCDDisplay;
+}
+void Menu::setKeypad( AnalogButtons k ) {
+	keypad = k;
+	if (timer) processInput = &keypadProcInput;
+}
+
+void Menu::setTimer( AlarmTimer t ) {
+	timer = t;
+	if (keypad) processInput = &keypadProcInput;
+}
+
+void Menu::LCDdisplay(Menu &m) {
+	lcd.setCursor(0, 0);
+	lcd.print(m.name);
+}
+
 void Menu::_display(Menu &m) {
-	Serial.println(name);
+	Serial.println(m.name);
 }
 
 char Menu::_input(Menu &m) {
@@ -98,6 +118,25 @@ Menu *Menu::_processInput(Menu &m) {
 	}
 }
 
+Menu *Menu::keypadProcInput(Menu &m) {
+	Timer menuTimeout(MENU_TIMEOUT);
+	do {
+		timer.delay(1);   // Allow alarm to interrupt to do other tasks
+		keypad.read();
+	} while (keypad.getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
+
+	switch (keypad.getButtonWas()) {
+	case BUTTON_UP: 	   return m.up();
+	case BUTTON_DOWN: 	 return m.down();
+	case BUTTON_LEFT: 	 return m.left();
+	case BUTTON_RIGHT: 	 return m.right();
+	case BUTTON_SELECT: return m.right();   // Select activates child menu, just like right
+	// case 'b': return m.back();
+	case BUTTON_NONE:   return NULL;
+	default: return &this;
+	}
+}
+
 // Menu construction primitives
 Menu &Menu::addChild( Menu &c) {
 	if (child) {
@@ -111,6 +150,7 @@ Menu &Menu::addChild( Menu &c) {
 	return this;   // Return self to enable chaining
 }
 
+// Add sibling is problematic as there may be no parent. Could make protected
 Menu &Menu::addSibling( Menu &c, bool _loop) {
 	if (next) {
 		if (_loop) {
@@ -160,9 +200,9 @@ MenuValue::MenuValue(const char *n,
 
 void MenuValue::_display(Menu &m) {
   if (selected) {
-    Serial.println("Set " + name + ": " + value);
+    Serial.println("Set " + name + ": ", value);
   } else {
-    Serial.println(name + " = " + value);
+    Serial.println(name + " = ", value);
   }
 }
 
@@ -207,12 +247,20 @@ Menu *MenuValue::back() {
 	return getif(last);
 }
 
+LCDMenu::LCDMenu( LiquidCrystal _lcd ) {
+  lcd = _lcd;
+}
+
 void LCDMenu::display( ) {
 	lcd.setCursor(0, 0);
 	lcd.print(name);
 }
 
-Menu KeypadMenu::processInput() {
+KeypadMenu::KeypadMenu( AnalogButtons k ) {
+  keypad = k;
+}
+
+Menu *KeypadMenu::processInput() {
 	Timer menuTimeout(MENU_TIMEOUT);
 	do {
 		keypad.read();
@@ -227,7 +275,114 @@ Menu KeypadMenu::processInput() {
 	case BUTTON_SELECT:  return right();   // Select activates child menu, just like right
 	// case 'b': return m.back();
 	// case 'q': return NULL;
-	default: return this;
+	default: return &this;
 	}
+}
+
+
+Menu *MenuValue::up() {
+	if (!selected)
+		return getif(prev);
+	else {
+		value++;
+		return &this;
+	}
+}
+
+Menu *MenuValue::down() {
+	if (!selected)
+		return getif(next);
+	else {
+		value--;
+		return &this;
+	}
+}
+
+Menu *MenuValue::left() {
+	if (!selected) {
+		return getif(parent);
+	} else {
+		selected = false;
+		return &this;
+	}
+}
+
+Menu *MenuValue::right() {
+	selected = true;
+	return &this;
+}
+
+/* class MenuArray : Menu {
+protected:
+  int[] values;
+  bool  selected = false;
+  */
+
+MenuArray::MenuArray(const char *n,
+		  int &v,
+		  const void (*dis)(Menu &m) = _display,
+		  const char (*procin)(Menu &m) = _processInput,
+		  const char (*in)(Menu &m) = _input) {
+	name = n;
+	input = in(this);
+	processInput = procin(this);
+	display = dis(this);
+	current = &this;
+	values = vs;
+	selected = false;
+}
+
+
+MenuArray::MenuArray();
+
+Menu *MenuArray::up() {
+  if (selected)
+    values[index] += 0.5;
+    return &this;
+  else
+    return getif(prev);
+}
+
+Menu *MenuArray::down() {
+  if (selected)
+    values[index] -= 0.5;
+    return &this;
+  else
+    return getif(next);
+}
+
+Menu *MenuArray::left() {
+  if (selected)
+    index = max(0, index-1);
+    return &this;
+  else
+    return getif(parent);
+}
+
+Menu *MenuArray::right() {
+  if (selected)
+    index = min(19, index+1);
+  else
+    return select();
+}
+
+void MenuArray::display(Menu &m) {
+     if (selected) {
+       m.lcd.setCursor(1,1);
+     m.lcd.setCursor(4, 1);
+     m.lcd.print(m.index + 1, DEC);
+     m.lcd.print("  ");    // Make sure previous value is overwritten
+     // Make sure set point is printed in the right place
+     m.lcd.setCursor(11, 1);
+     m.lcd.print(m.values[m.index], DEC);
+   } else {
+     m.lcd.setCursor(4, 1);
+     m.lcd.print(m.index + 1, DEC);
+     m.lcd.print("  ");    // Make sure previous value is overwritten
+
+     // Make sure set point is printed in the right place
+     m.lcd.setCursor(11, 1);
+     m.lcd.print(m.values[m.index], DEC);
+   }
 }
 
