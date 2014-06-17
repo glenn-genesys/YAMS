@@ -40,6 +40,7 @@
 
 #include "TimeAlarms.h"
 #include "AnalogButtons.h"
+#include <LiquidCrystal.h>
 
 #define MENU_TIMEOUT 30000
 
@@ -49,7 +50,7 @@ extern "C" {
 
 class Menu {
 protected:
-	char *name;
+	const char *name;
 	// Variables that hold the data structure of menu connections
 	Menu *parent;
 	Menu *child;  // the first of the linked list of children
@@ -60,12 +61,12 @@ protected:
 	static Menu *last;        // Single entry for back button
 	static Menu *current;     // Current menu location
 
-	char (*input)(Menu &m);   // Function pointer to blocking or non-blocking input function
-	char (*processInput)(Menu &m);  // Function pointer to input interpreter
-	void (*display)(Menu &m); // Function pointer to display method
+	void  (*display)(Menu &m); // Function pointer to display method
+	Menu* (*processInput)(Menu &m);  // Function pointer to input interpreter
+	char const (*input)(Menu &m);   // Function pointer to blocking or non-blocking input function
 
-	static LiquidCrystal lcd;
-	static AnalogButtons keypad;
+	static LiquidCrystal *lcd;
+	static AnalogButtons *keypad;
 
 	/* static void serialDisplay(Menu &m);   // Default display method
 	static void lcdDisplay(Menu &m);
@@ -74,18 +75,18 @@ protected:
   	static Menu *keypadProcInput(Menu &m);
 	 */
 
-	const static void _display(Menu &m);
-	const static char _input(Menu &m);     // Default non-blocking function to get input
-	const static Menu *_processInput(Menu &m); // Default input interpreter
+	static void  _display(Menu &m);
+	static Menu* _processInput(Menu &m); // Default input interpreter
+	static const char  _input(Menu &m);     // Default non-blocking function to get input
 
-	static Menu *getif(Menu *t);
+	Menu *getif(Menu *t);
 
 public:
 	Menu(const char *n,
-		 const bool loop,
-		 const void (*display)(Menu &m),
-		 const Menu (*processInput)(Menu &m),
-		 const char (*input)(Menu &m));
+		 bool loop,
+		 void (*dis)(Menu &m) = _display,
+		 Menu* (*procin)(Menu &m) = _processInput,
+		 const char (*in)(Menu &m) = _input);
 
   /* Menu(const char *n,
        const bool loop,
@@ -93,6 +94,8 @@ public:
 
 	enum io;
    */
+
+	Menu();
 
 	virtual ~Menu();
 	
@@ -118,48 +121,52 @@ public:
 
 };
 
-class MenuValue : Menu {
+class MenuValue : public Menu {
 protected:
-	int &value;
+	int value;
 	bool selected;  // When MenuValue is selected, up and down adjust value
 
 public:
 	MenuValue(const char *n,
 			  int v,
-			  const void (*dis)(Menu &m),
-			  const Menu* (*procin)(Menu &m),
-			  const char (*in)(Menu &m));
-/*
- * 	MenuValue(const char *n,
-			  int &v,
-			  const void (*dis)(Menu &m) = _display,
-			  const Menu* (*procin)(Menu &m) = _processInput,
+			  void (*dis)(Menu &m) = v_display,
+			  Menu* (*procin)(Menu &m) = _processInput,
 			  const char (*in)(Menu &m) = _input);
- *
- */
-
-
-  /* MenuValue(const char *n,
-			  int &v,
-         const io   parts);
-  */
 
 	int getValue();
 	void setValue(int v);
+
+	static void v_display(Menu &mm);
+
+	Menu *left();
+	Menu *right();
+	Menu *up();
+	Menu *down();
+	Menu *select();
+	Menu *back();
 };
 
-class MenuArray : Menu {
+class MenuArray : public Menu {
 protected:
-  float values[];
+  float *values;
   bool  selected;
   int index;
   
 public:
   MenuArray(const char *n,
-		  float &vs,
-		  const void (*display)(Menu &m),
-		  const char (*processInput)(Menu &m),
-		  const char (*input)(Menu &m));
+		  float vs[],
+		  void (*dis)(Menu &m) = a_display,
+		  Menu* (*procin)(Menu &m) = _processInput,
+		  const char (*in)(Menu &m) = _input);
+
+	static void a_display(Menu &mm);
+
+	Menu *left();
+	Menu *right();
+	Menu *up();
+	Menu *down();
+	// Menu *select();
+	// Menu *back();
 };
 
 #ifdef __cplusplus

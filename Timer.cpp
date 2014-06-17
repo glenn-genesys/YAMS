@@ -1,4 +1,4 @@
-#include <Timer.h>
+#include "Timer.h"
 
 /* class Timer {
 private:
@@ -21,14 +21,20 @@ private:
   char* Timer::toString() const {
 	  if (alarm == -1)   return "Not set";
 	  if (alarm < now()) return "Beep";
-	  if (alarm - now() < 60) return "" + alarm + "." + alarm_ms;
+	  if (alarm - now() < 60) {
+		  char result[18];
 
-	  char result[18];
+		  sprintf(result, "%d.%d", alarm, alarm_ms);
 
-	  sprintf(result, "%02d:%02d:%02d %02d/%02d/%02d", hour(alarm), minute(alarm), second(alarm),
-			  day(alarm), month(alarm), year(alarm));
+		  return result;
+	  } else {
+		  char result[18];
 
-	  return result;
+		  sprintf(result, "%02d:%02d:%02d %02d/%02d/%02d", hour(alarm), minute(alarm), second(alarm),
+				  day(alarm), month(alarm), year(alarm));
+
+		  return result;
+	  }
   }
   
   // Extend the alarm by the given number of milliseconds
@@ -55,7 +61,7 @@ private:
   }
   
   // Returns true if the alarm has gone off and clears the alarm if clear is true
-  bool Timer::timeUp(bool clear = true) {
+  bool Timer::timeUp(bool clear) {
     if (alarm >= 0 && now() >= alarm) {
         if (clear) alarm = -1;
         return true;

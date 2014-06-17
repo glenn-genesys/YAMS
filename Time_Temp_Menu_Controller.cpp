@@ -39,10 +39,10 @@ While running, record history of temperatures, min and max per hour
 #include <Wire.h>
 #include <LiquidCrystal.h>   // include LCD library
 #include <Time.h>
-
 #include "Timer.h"
 #include "YAMS.h"
 #include "AnalogButtons.h"
+
 /*--------------------------------------------------------------------------------------
   Defines
 --------------------------------------------------------------------------------------*/
