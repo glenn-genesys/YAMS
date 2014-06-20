@@ -109,11 +109,11 @@ OneWire  ds(2);  // on pin 2 (a 4.7K resistor is necessary)
 MenuValue runDays      = MenuValue("Days", 0);
 MenuValue runHours     = MenuValue("Hours", 0);
 
-Menu runningTime       = Menu("Get/Set Runtime", false).addChild( runDays ).addChild( runHours );
+Menu runningTime       = Menu("Get/Set Runtime", true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
 
 MenuArray scheduleMenu = MenuArray("Schedule", schedule);
 
-Menu mm = Menu("Main Menu", false).addChild( runningTime ).addChild( scheduleMenu );
+Menu mm = Menu("Main Menu", true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
 
 /*    MenuItem review         = MenuItem(menu, "Review", 2);
       MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
@@ -133,7 +133,7 @@ void updateTemp();
   Called by the Arduino framework once, before the main loop begins
 --------------------------------------------------------------------------------------*/
 void setup(void) {
-  Serial.begin(9600);
+  Serial.begin(19200);
    //button adc input
    pinMode( BUTTON_ADC_PIN, INPUT );         //ensure A0 is an input
    digitalWrite( BUTTON_ADC_PIN, LOW );      //ensure pullup is off on A0
@@ -171,30 +171,19 @@ void setup(void) {
     Mode       Schedule/Fixed
     */
 
+   Alarm.delay(2000);
+
    mm.setLCD(lcd);
    mm.setKeypad(keypad);
 
    lcd.setCursor(0, 0);
-   lcd.print("Heating/Cooling");
+   lcd.print(F("Heating/Cooling"));
+   Serial.print(F("Heating/Cooling"));
+
    Alarm.delay(2000);
 
    normalDisplay();
 }
-
-/*
-class RuntimeMenu : Menu { // : Menu("Get/Set Runtime"), startTime(now()) {
-
-	void display2(void *(print(char *)) pr) {
-		long runtime = now() - startTime();
-		char result[18];
-		sprintf(result, "%02d days %02d hr", elapsedDays(runtime), numberOfHours(runtime));
-		pr(result);
-	}
-
-private:
-	long startTime;
-}  */
-
 
 /*--------------------------------------------------------------------------------------
   loop()
@@ -312,25 +301,28 @@ private:
      12 Days 15:23:59
 */
 void normalDisplay() {
+
+   // Serial.println("Normal display");
    lcd.setCursor( 0, 0 );   //top left
-   lcd.print(smoothedTemp, DEC);
+
+   lcd.print(smoothedTemp, 2);
    // Overwrite from fourth decimal place
-   lcd.setCursor( 0, 6 );  
-   lcd.print(" C / ");
-   lcd.print(setPoint, DEC);
-   lcd.setCursor( 0, 14 );  
+   // lcd.setCursor( 6, 0 );
+   lcd.print("C /  ");
+   lcd.print(setPoint, 2);
    lcd.print("C");
    
-   lcd.setCursor( 1, 0 );   //bottom left
+   lcd.setCursor( 0, 1 );   //bottom left
 
-   char currentTime[9];
+   char tempStr[16];
+   sprintf(tempStr, "Day %02d %02d:%02d:%02d", day(), hour(), minute(), second());
 
-   sprintf(currentTime, "%dd:%dd:%dd", hour(), minute(), second());
-
-   lcd.print(currentTime);
+   lcd.print(tempStr);
 }
 
 void unlockAppliance() {
+  Serial.println("Unlock appliance");
+
     recentlySwitched = false;
 }
 
@@ -341,13 +333,15 @@ void unlockAppliance() {
  */
 void runningMode(float setPoint) {
 
+  Serial.println(F("Running mode"));
+
   Timer redrawTime = Timer(REDRAW_PERIOD);
   // redraw = Alarm.timerRepeat(REDRAW_PERIOD, normalDisplay);
 
   do {
+	Alarm.delay(100);    // Allow system to check for other events
+
     keypad.read();
-    
-    Alarm.delay(0);    // Allow system to check for other events
     
     if (redrawTime.timeUp()) {
     
@@ -360,12 +354,14 @@ void runningMode(float setPoint) {
         applianceOn = coolingMode == (temperature > setPoint);
         
         if (prevState != applianceOn) {
+          Serial.println("Turn appliance " + applianceOn ? "on" : "off");
+
           recentlySwitched = true;
           Alarm.timerOnce(RESWITCH_TIME, unlockAppliance);      // Allow switching again after reswitch period
         }
       }
     };
-  } while (!keypad.getButtonJustPressed());
+  } while (!keypad.getButtonJustPressed()); 
 }
 
 /*--------------------------------------------------------------------------------------
@@ -375,6 +371,8 @@ void runningMode(float setPoint) {
 void loop(void) {
   runningMode(setPoint);
   
+  Serial.println(keypad.getButtonJustPressed(), DEC);
+
   mm.activate();
 }
 
@@ -446,9 +444,9 @@ float readTemp() {
     data[i] = ds.read();
     dataSum += data[i];
     
-    Serial.print(data[i], HEX);
+    // Serial.print(data[i], HEX);
   }
-  Serial.println();
+  // Serial.println();
 
   if (dataSum == 0) alarm(NO_SENSOR);
 

@@ -88,6 +88,8 @@ Menu *Menu::back() {
 }
 
 void Menu::activate() {
+	showStructure(true);
+	if (current->display)
 	do {
 		current->display(*this);
 
@@ -126,16 +128,21 @@ Menu *Menu::_processInput(Menu &m) {
 }
 
 void Menu::LCDdisplay(Menu &m) {
-	lcd->setCursor(1, 1);
+  Serial.println("LCDDisplay");
+	lcd->setCursor(0, 0);
 	lcd->print(m.name);
 }
 
 Menu *Menu::keypadProcInput(Menu &m) {
+  Serial.println("keypadProcInput");
 	Timer menuTimeout(MENU_TIMEOUT);
 	do {
-		Alarm.delay(1);   // Allow alarm to interrupt to do other tasks
+		Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
 		keypad->read();
 	} while (keypad->getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
+
+  Serial.print("Button was ");
+  Serial.println(keypad->getButtonWas(), DEC);
 
 	switch (keypad->getButtonWas()) {
 	case BUTTON_UP: 	   return m.up();
@@ -155,6 +162,7 @@ Menu &Menu::addChild( Menu &c) {
 		child->addSibling(c, loop);
 	} else {
 		child = &c;
+		// c.parent = this;
 		if (loop) {
 			c.next = c.prev = &c;
 		}
@@ -171,6 +179,7 @@ Menu &Menu::addSibling( Menu &c, bool _loop) {
 			c.prev = prev;
 			c.next = this;
 			prev = &c;
+			// c.parent = parent;
 			return *this;
 		} else {
 			// Recursively find last sibling and append
@@ -183,13 +192,51 @@ Menu &Menu::addSibling( Menu &c, bool _loop) {
 			c.prev = this;
 			prev = &c;
 			next = &c;
+			// c.parent = parent;
 		} else {
 			next = &c;
 			c.prev = this;
+			// c.parent = parent;
 		}
 	}
 	return c;
 }
+
+// Recursively display the structure of the menu
+void Menu::showStructure(bool full) {
+	// Serial.print(F("Menu "));
+	Serial.println(name);
+  
+  // Show parent name, prev and next names
+  if (parent && full) {
+	  Serial.print(F("Parent "));
+	  Serial.println(parent->name);
+  }
+  
+  if (prev && full) {
+    Serial.print(F("Prev "));
+    Serial.println(prev->name);
+  }
+  if (next && full) {
+   Serial.print(F("Next "));
+   Serial.println(next->name);
+  }
+  
+  // Recursively list children
+  if (child) {
+    Serial.println(F("Children:"));
+  
+    Menu *m = child;
+    do {
+      m->showStructure(full);
+      m = m->next;
+    } while (m && m != child);
+
+    Serial.print(F("End children of "));
+    Serial.println(name);
+  }
+  
+}    
 
 // class MenuValue : Menu {
 // protected:

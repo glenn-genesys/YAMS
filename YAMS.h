@@ -113,12 +113,13 @@ public:
 	void setKeypad( AnalogButtons k );
 
 	static void LCDdisplay(Menu &m);
-	static Menu *keypadProcInput(Menu &m);
+	static Menu *keypadProcInput(Menu &m); 
 
 		// Menu construction
 	Menu &addChild( Menu &c);
 	Menu &addSibling( Menu &c, bool loop);   // Adds siblings in a loop if loop is true (ignores parent.loop)
 
+  void showStructure(bool full);    // Displays the structure of the menu
 };
 
 class MenuValue : public Menu {
