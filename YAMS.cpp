@@ -27,6 +27,12 @@ Menu *Menu::current;     // Current menu location
 LiquidCrystal *Menu::lcd;
 AnalogButtons *Menu::keypad;
 
+int freeRam () {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
 // Default input function is _input(). Default display method is _default()
 Menu::Menu(const char *n,
 		bool loop = false,
@@ -88,12 +94,17 @@ Menu *Menu::back() {
 }
 
 void Menu::activate() {
-	showStructure(true);
-	if (current->display)
+	lcd->setCursor(0,0);
+	lcd->print("Boo");
+	  Serial.println(freeRam());
+	 showStructure(true);
+	//  Serial.println(freeRam());
+	
+	if (current)
 	do {
-		current->display(*this);
+    	Menu::LCDdisplay(*current);
 
-		current = current->processInput(*this);
+		current = Menu::keypadProcInput(*current);
 	} while (current);   // NULL from process input means exit menu
 }
 
@@ -106,15 +117,15 @@ void Menu::setKeypad( AnalogButtons k ) {
 	processInput = &keypadProcInput;
 }
 
-void Menu::_display(Menu &m) {
+void Menu::serialDisplay(Menu &m) {
 	Serial.println(m.name);
 }
 
-const char Menu::_input(Menu &m) {
+const char Menu::serialInput(Menu &m) {
 	return Serial.read();
 }
 
-Menu *Menu::_processInput(Menu &m) {
+Menu *Menu::serialProcessInput(Menu &m) {
 	switch (m.input(m)) {
 	case 'u': return m.up();
 	case 'd': return m.down();
@@ -128,20 +139,21 @@ Menu *Menu::_processInput(Menu &m) {
 }
 
 void Menu::LCDdisplay(Menu &m) {
-  Serial.println("LCDDisplay");
+	Serial.print(F("LCDdisplay: "));
+	Serial.println(m.name);
 	lcd->setCursor(0, 0);
 	lcd->print(m.name);
 }
 
 Menu *Menu::keypadProcInput(Menu &m) {
-  Serial.println("keypadProcInput");
+  Serial.println(F("keypadProcInput"));
 	Timer menuTimeout(MENU_TIMEOUT);
 	do {
 		Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
 		keypad->read();
 	} while (keypad->getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
 
-  Serial.print("Button was ");
+  Serial.print(F("Button was "));
   Serial.println(keypad->getButtonWas(), DEC);
 
 	switch (keypad->getButtonWas()) {
@@ -162,7 +174,7 @@ Menu &Menu::addChild( Menu &c) {
 		child->addSibling(c, loop);
 	} else {
 		child = &c;
-		// c.parent = this;
+		c.parent = this;
 		if (loop) {
 			c.next = c.prev = &c;
 		}
@@ -179,7 +191,7 @@ Menu &Menu::addSibling( Menu &c, bool _loop) {
 			c.prev = prev;
 			c.next = this;
 			prev = &c;
-			// c.parent = parent;
+			c.parent = parent;
 			return *this;
 		} else {
 			// Recursively find last sibling and append
@@ -192,11 +204,11 @@ Menu &Menu::addSibling( Menu &c, bool _loop) {
 			c.prev = this;
 			prev = &c;
 			next = &c;
-			// c.parent = parent;
+			c.parent = parent;
 		} else {
 			next = &c;
 			c.prev = this;
-			// c.parent = parent;
+			c.parent = parent;
 		}
 	}
 	return c;
@@ -204,7 +216,6 @@ Menu &Menu::addSibling( Menu &c, bool _loop) {
 
 // Recursively display the structure of the menu
 void Menu::showStructure(bool full) {
-	// Serial.print(F("Menu "));
 	Serial.println(name);
   
   // Show parent name, prev and next names
@@ -260,7 +271,7 @@ MenuValue::MenuValue(const char *n,
 void MenuValue::v_display(Menu &mm) {
 	MenuValue &m = static_cast<MenuValue &>(mm);
   if (m.selected) {
-	    Serial.print("Set " );
+	    Serial.print(F("Set ") );
 	    Serial.print(m.name);
 	    Serial.print(": ");
 	    Serial.println(m.value, DEC);

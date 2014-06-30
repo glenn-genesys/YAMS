@@ -95,6 +95,7 @@ AnalogButtons AnalogButtons::read()
 
    //save the latest button value, for change event detection next time round
    buttonWas = button;
+   // voltageWas = buttonVoltage;
 
    return *this;
 }

@@ -30,7 +30,8 @@ public:
   // Construct an alarm for a specified time
   // Timer(time_t t);
 
-  char* toString() const;
+  // char* toString() const;
+  void print() const;
   
   // Extend the alarm by the given time interval in ms
   void extend(long ms);

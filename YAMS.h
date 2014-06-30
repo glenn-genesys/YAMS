@@ -61,6 +61,7 @@ protected:
 	static Menu *last;        // Single entry for back button
 	static Menu *current;     // Current menu location
 
+  // Functions pointers
 	void  (*display)(Menu &m); // Function pointer to display method
 	Menu* (*processInput)(Menu &m);  // Function pointer to input interpreter
 	char const (*input)(Menu &m);   // Function pointer to blocking or non-blocking input function
@@ -75,18 +76,22 @@ protected:
   	static Menu *keypadProcInput(Menu &m);
 	 */
 
-	static void  _display(Menu &m);
-	static Menu* _processInput(Menu &m); // Default input interpreter
-	static const char  _input(Menu &m);     // Default non-blocking function to get input
-
 	Menu *getif(Menu *t);
 
 public:
+	// Default implementations
+	static void  serialDisplay(Menu &m);
+	static Menu* serialProcessInput(Menu &m); // Default input interpreter
+	static const char  serialInput(Menu &m);     // Default non-blocking function to get input
+
+	static void LCDdisplay(Menu &m);
+	static Menu *keypadProcInput(Menu &m);
+
 	Menu(const char *n,
 		 bool loop,
-		 void (*dis)(Menu &m) = _display,
-		 Menu* (*procin)(Menu &m) = _processInput,
-		 const char (*in)(Menu &m) = _input);
+		 void (*dis)(Menu &m) = serialDisplay,
+		 Menu* (*procin)(Menu &m) = serialProcessInput,
+		 const char (*in)(Menu &m) = serialInput);
 
   /* Menu(const char *n,
        const bool loop,
@@ -112,9 +117,6 @@ public:
 	void setLCD( LiquidCrystal l  );
 	void setKeypad( AnalogButtons k );
 
-	static void LCDdisplay(Menu &m);
-	static Menu *keypadProcInput(Menu &m); 
-
 		// Menu construction
 	Menu &addChild( Menu &c);
 	Menu &addSibling( Menu &c, bool loop);   // Adds siblings in a loop if loop is true (ignores parent.loop)
@@ -131,8 +133,8 @@ public:
 	MenuValue(const char *n,
 			  int v,
 			  void (*dis)(Menu &m) = v_display,
-			  Menu* (*procin)(Menu &m) = _processInput,
-			  const char (*in)(Menu &m) = _input);
+			  Menu* (*procin)(Menu &m) = serialProcessInput,
+			  const char (*in)(Menu &m) = serialInput);
 
 	int getValue();
 	void setValue(int v);
@@ -157,8 +159,8 @@ public:
   MenuArray(const char *n,
 		  float vs[],
 		  void (*dis)(Menu &m) = a_display,
-		  Menu* (*procin)(Menu &m) = _processInput,
-		  const char (*in)(Menu &m) = _input);
+		  Menu* (*procin)(Menu &m) = serialProcessInput,
+		  const char (*in)(Menu &m) = serialInput);
 
 	static void a_display(Menu &mm);
 

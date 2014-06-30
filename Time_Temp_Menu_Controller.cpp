@@ -52,12 +52,12 @@ While running, record history of temperatures, min and max per hour
 #define CONTROL_PIN               0  // D0 turns on power relay
 #define BUZZER_PIN                11 // Piezo buzzer
 
-#define AVERAGE_WEIGHT            0.1
-#define RESWITCH_TIME             120  // Minimum time between power cycling
+#define AVERAGE_WEIGHT            0.1 // For use when calculating moving average
+#define RESWITCH_TIME             10  // 120s Minimum time between power cycling (10 for testing)
 // Error codes
 #define NO_SENSOR                 1    // No or unexpected 1-wire temperature sensor connected
 #define SETPOINT_TOO_HIGH_LOW     2    // Can't reach setpoint. Too high (heating) or low (cooling).
-#define WRONG_SEASON              3    // Mode is set to heating (cooling) but should be cooling (heating)
+#define WRONG_MODE                3    // Mode is set to heating (cooling) but should be cooling (heating)
 #define WRONG_APPLIANCE           4    // Mode is set to heating (cooling) but attached appliance cools (heats)
 
 #define NO_ALARMS                 false   // To turn off all warning alarms
@@ -75,8 +75,8 @@ While running, record history of temperatures, min and max per hour
 --------------------------------------------------------------------------------------*/
 float temperature;
 float smoothedTemp      = 20;
-float setPoint          = 20.5;            // set point temp in degrees C 
-boolean recentlySwitched= true;
+float setPoint          = 21.5;            // set point temp in degrees C
+boolean recentlySwitched= false;
 boolean coolingMode     = true;
 boolean applianceOn     = false;
 
@@ -104,16 +104,23 @@ LiquidCrystal lcd( 8, 9, 4, 5, 6, 7 );   //Pins for the freetronics 16x2 LCD shi
 OneWire  ds(2);  // on pin 2 (a 4.7K resistor is necessary)
 
 //beneath is list of menu items needed to build the menu
+char *daySt = "Days";
+char *hrStr = "Hours";
+char *runStr = "Get/Set Runtime";
+char *schedStr = "Schedule";
+char *mainStr = "Main Menu";
 
 // By default, value enters a submenu to increment/decrement the value, on select
-MenuValue runDays      = MenuValue("Days", 0);
-MenuValue runHours     = MenuValue("Hours", 0);
+MenuValue *runDays      = new MenuValue(daySt, 0);
+MenuValue *runHours     = new MenuValue(hrStr, 0);
 
-Menu runningTime       = Menu("Get/Set Runtime", true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
+// Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
+Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);
 
-MenuArray scheduleMenu = MenuArray("Schedule", schedule);
+MenuArray *scheduleMenu = new MenuArray(schedStr, schedule);
 
-Menu mm = Menu("Main Menu", true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
+// Menu mm = Menu(mainStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
+Menu *mm = new Menu(mainStr, false, &Menu::LCDdisplay, &Menu::keypadProcInput);
 
 /*    MenuItem review         = MenuItem(menu, "Review", 2);
       MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
@@ -134,6 +141,7 @@ void updateTemp();
 --------------------------------------------------------------------------------------*/
 void setup(void) {
   Serial.begin(19200);
+
    //button adc input
    pinMode( BUTTON_ADC_PIN, INPUT );         //ensure A0 is an input
    digitalWrite( BUTTON_ADC_PIN, LOW );      //ensure pullup is off on A0
@@ -145,7 +153,7 @@ void setup(void) {
 
    // Set time to 8:29:00am 14 May 2014
    // setTime(8,29,0,14,5,14);
-   setTime(8,29,0,16,6,14);
+   setTime(9,50,0,2,7,14);
 
    // Initialise temperature sensor
    updateTemp();
@@ -173,12 +181,20 @@ void setup(void) {
 
    Alarm.delay(2000);
 
-   mm.setLCD(lcd);
-   mm.setKeypad(keypad);
+   runningTime->addChild( *runDays ).addChild( *runHours );
+   mm->addChild( *runningTime ).addChild( *scheduleMenu );
+
+   mm->setLCD(lcd);
+   mm->setKeypad(keypad);
 
    lcd.setCursor(0, 0);
-   lcd.print(F("Heating/Cooling"));
-   Serial.print(F("Heating/Cooling"));
+   if (coolingMode) {
+	   lcd.print(F("Cooling"));
+	   Serial.print(F("Cooling"));
+   } else {
+	   lcd.print(F("Heating"));
+	   Serial.print(F("Heating"));
+   }
 
    Alarm.delay(2000);
 
@@ -295,6 +311,48 @@ void setup(void) {
 
 } */
 
+void alarm(int alarmType) {
+  if (NO_ALARMS) return;
+
+  switch (alarmType)
+  {
+    case NO_SENSOR:
+    {
+      tone(BUZZER_PIN, 2000, 500);
+      Alarm.delay(500);
+      break;
+    }
+    case SETPOINT_TOO_HIGH_LOW:
+    {
+      tone(BUZZER_PIN, 500, 500);
+      Alarm.delay(0);
+      tone(BUZZER_PIN, 500, 500);
+      Alarm.delay(0);
+      tone(BUZZER_PIN, 5000, 500);
+      Alarm.delay(0);
+      tone(BUZZER_PIN, 5000, 500);
+      Alarm.delay(0);
+      break;
+    }
+    case WRONG_MODE:
+    {
+      for (int i=100; i<5000; i=i+100 ) {
+        tone(BUZZER_PIN, i, 50);
+        Alarm.delay(0);
+      }
+      break;
+    }
+    case WRONG_APPLIANCE:
+    {
+      for (int i=5000; i>100; i=i-100) {
+        tone(BUZZER_PIN, i, 50);
+        Alarm.delay(0);
+      }
+      break;
+    }
+  }
+}
+
 /*
    Display current days/hours running time, current temp and set point
      19.375 C / 20.0C
@@ -321,7 +379,7 @@ void normalDisplay() {
 }
 
 void unlockAppliance() {
-  Serial.println("Unlock appliance");
+  Serial.println(F("Unlock appliance"));
 
     recentlySwitched = false;
 }
@@ -336,31 +394,49 @@ void runningMode(float setPoint) {
   Serial.println(F("Running mode"));
 
   Timer redrawTime = Timer(REDRAW_PERIOD);
+  if (redrawTime.timeUp(false)) Serial.print("Timer fail");
   // redraw = Alarm.timerRepeat(REDRAW_PERIOD, normalDisplay);
 
   do {
+	Serial.print(".");
 	Alarm.delay(100);    // Allow system to check for other events
 
     keypad.read();
     
-    if (redrawTime.timeUp()) {
+    if (redrawTime.timeUp() || true) {
     
       normalDisplay();
       redrawTime.extend(REDRAW_PERIOD);
       
       // Apply temperature control logic
       if (!recentlySwitched) {
+      	Serial.print("*");
         boolean prevState = applianceOn;
-        applianceOn = coolingMode == (temperature > setPoint);
+        applianceOn = coolingMode == (smoothedTemp > setPoint);
         
         if (prevState != applianceOn) {
-          Serial.println("Turn appliance " + applianceOn ? "on" : "off");
+          Serial.print(F("Turn appliance "));
+          Serial.println(applianceOn ? "on" : "off");
 
           recentlySwitched = true;
           Alarm.timerOnce(RESWITCH_TIME, unlockAppliance);      // Allow switching again after reswitch period
         }
       }
-    };
+      if (applianceOn) {
+          digitalWrite( CONTROL_PIN, HIGH );
+          digitalWrite( LCD_BACKLIGHT_PIN, LOW );
+          delay( 20 );
+          digitalWrite( LCD_BACKLIGHT_PIN, HIGH );   //leave the backlight on at exit
+      } else {
+        digitalWrite( CONTROL_PIN, LOW );
+      }
+
+      float rateOfChange		= temperature - smoothedTemp;
+      // Check for alarm states
+      // if (applianceOn && (coolingMode == (rateOfChange > 0.0))) alarm(WRONG_APPLIANCE);
+      // if (!applianceOn && ((coolingMode && smoothedTemp < setPoint - 0.5) || (!coolingMode && smoothedTemp > setPoint + 0.5))) alarm(WRONG_MODE);
+
+    }
   } while (!keypad.getButtonJustPressed()); 
 }
 
@@ -373,49 +449,7 @@ void loop(void) {
   
   Serial.println(keypad.getButtonJustPressed(), DEC);
 
-  mm.activate();
-}
-
-void alarm(int alarmType) {
-  if (NO_ALARMS) return;
-  
-  switch (alarmType)
-  {
-    case NO_SENSOR:
-    {
-      tone(BUZZER_PIN, 2000, 500);
-      Alarm.delay(500);
-      break;
-    }
-    case SETPOINT_TOO_HIGH_LOW:   
-    {
-      tone(BUZZER_PIN, 500, 500);
-      Alarm.delay(0);
-      tone(BUZZER_PIN, 500, 500);
-      Alarm.delay(0);
-      tone(BUZZER_PIN, 5000, 500);
-      Alarm.delay(0);
-      tone(BUZZER_PIN, 5000, 500);
-      Alarm.delay(0);
-      break;
-    }
-    case WRONG_SEASON:
-    {
-      for (int i=100; i<5000; i=i+100 ) {
-        tone(BUZZER_PIN, i, 50);
-        Alarm.delay(0);
-      }
-      break;
-    }
-    case WRONG_APPLIANCE:
-    {
-      for (int i=5000; i>100; i=i-100) {
-        tone(BUZZER_PIN, i, 50);
-        Alarm.delay(0);
-      }
-      break;
-    }
-  }
+  // mm->activate();
 }
 
 float readTemp() {
@@ -486,12 +520,16 @@ float readTemp() {
 void updateTemp() {
    temperature = readTemp();
    
-   smoothedTemp = smoothedTemp * (1 - AVERAGE_WEIGHT) + temperature * AVERAGE_WEIGHT;
+   if (temperature != 0.0 && temperature < 85.0) {
+	   smoothedTemp = smoothedTemp * (1 - AVERAGE_WEIGHT) + temperature * AVERAGE_WEIGHT;
+   }
 
-   hourlyMax[runHours.getValue()] = max(hourlyMax[runHours.getValue()], smoothedTemp);
-   hourlyMin[runHours.getValue()] = min(hourlyMin[runHours.getValue()], smoothedTemp);
-   dailyMax[runDays.getValue()]   = max(dailyMax[runDays.getValue()], smoothedTemp);
-   dailyMin[runDays.getValue()]   = min(dailyMin[runDays.getValue()], smoothedTemp);
+   setPoint = schedule[day() - 1];
+
+   hourlyMax[runHours->getValue()] = max(hourlyMax[runHours->getValue()], smoothedTemp);
+   hourlyMin[runHours->getValue()] = min(hourlyMin[runHours->getValue()], smoothedTemp);
+   dailyMax[runDays->getValue()]   = max(dailyMax[runDays->getValue()], smoothedTemp);
+   dailyMin[runDays->getValue()]   = min(dailyMin[runDays->getValue()], smoothedTemp);
 }
 
 void updateRuntime() {

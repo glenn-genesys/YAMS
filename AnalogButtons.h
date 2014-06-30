@@ -18,10 +18,10 @@ extern "C" {
 // ADC readings expected for the 5 buttons on the ADC input -- could be parameterised
 #define RIGHT_10BIT_ADC           0  // right
 #define UP_10BIT_ADC            145  // up
-#define DOWN_10BIT_ADC          329  // down
+#define DOWN_10BIT_ADC          333  // down
 #define LEFT_10BIT_ADC          505  // left
 #define SELECT_10BIT_ADC        741  // right
-#define BUTTONHYSTERESIS         10  // hysteresis for valid button sensing window
+#define BUTTONHYSTERESIS         15  // hysteresis for valid button sensing window
 //return values for ReadButtons()
 #define BUTTON_NONE               0  //
 #define BUTTON_RIGHT              1  //
@@ -38,6 +38,7 @@ private:
 	byte buttonWas;             //used by ReadButtons() for detection of button events
 
 public:
+	// unsigned int voltageWas; // Useful for debugging
 	AnalogButtons(byte pin);
 	virtual ~AnalogButtons();
 
