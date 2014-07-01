@@ -5,10 +5,15 @@
 /*--------------------------------------------------------------------------------------
  * Init the analog button shield using pin A0
  */
-AnalogButtons button(BUTTON_ADC_PIN);
+// AnalogButtons button(BUTTON_ADC_PIN);
+AnalogButtons button(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
 bool prevPressed = false;
 
-void kt_setup() {}
+void k_setup() {
+	Serial.begin(19200);
+
+	button.calibrate();
+}
 
 void displayButton(int b) {
      switch( b )
@@ -50,12 +55,14 @@ void displayButton(int b) {
 
 }
 
-void kt_loop() {
+void k_loop() {
    button.read();
 
    if (button.getButtonJustPressed() && !prevPressed) {
      //show text label for the button pressed
-	   // Serial.print(button.voltageWas, DEC);
+#ifdef SHOW_VOLTAGE
+	   Serial.print(button.voltageWas, DEC);
+#endif
       displayButton(button.getButtonWas());
       Serial.println(" pressed");
       prevPressed = true;
@@ -63,7 +70,9 @@ void kt_loop() {
 
    if (button.getButtonJustReleased() && prevPressed) {
      //show text label for the button pressed
-	   // Serial.print(button.voltageWas, DEC);
+#ifdef SHOW_VOLTAGE
+	   Serial.print(button.voltageWas, DEC);
+#endif
       displayButton(button.getButtonWas());
       Serial.println(" released");
       prevPressed = false;

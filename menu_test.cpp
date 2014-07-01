@@ -13,7 +13,7 @@
   /*--------------------------------------------------------------------------------------
    * Init the analog button shield using pin A0
    */
-  AnalogButtons tkeypad(BUTTON_ADC_PIN);
+  AnalogButtons tkeypad(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
 
 
 void localMenu() {
@@ -87,20 +87,20 @@ void m_setup() {
 	   pinMode( LCD_BACKLIGHT_PIN, OUTPUT );     //D3 is an output
 	   digitalWrite( LCD_BACKLIGHT_PIN, HIGH );
 
-	   Serial.println(F("Setup global menu"));
+	   // Serial.println(F("Setup global menu"));
 	   tlcd.setCursor(0, 0);
 	   tlcd.print(F("Testing"));
 	   globalMenu();
 }
 
 void m_loop() {
-	Serial.println(F("Local menu"));
-  localMenu();
+	// Serial.println(F("Local menu"));
+	// localMenu();
 	Serial.println(F("Global menu"));
-  gm->activate();
+	gm->activate();
   
 	Serial.println(F("LCD menu"));
-  lcdMenu();
+	lcdMenu();
 	Serial.println(F("Keypad menu"));
-  keypadMenu();
+	keypadMenu();
 }

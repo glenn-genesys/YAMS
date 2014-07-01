@@ -7,11 +7,19 @@
 
 #include "AnalogButtons.h"
 
-AnalogButtons::AnalogButtons(byte pin) {
+// AnalogButtons(A0, 0, 145, 333, 505, 741)    Freetronics   
+// AnalogButtons(A0, 0, 98, 252, 407, 637)     Other one
+AnalogButtons::AnalogButtons(byte pin, int rv=0, int uv=145, int dv=333, int lv=505, int sv=741):
+	RIGHT_10BIT_ADC(rv), UP_10BIT_ADC(uv), DOWN_10BIT_ADC(dv), LEFT_10BIT_ADC(lv), SELECT_10BIT_ADC(sv)
+ {
 	ADC_PIN = pin;
 	buttonJustPressed  = false;
 	buttonJustReleased = false;
 	buttonWas          = BUTTON_NONE;
+#ifdef SHOW_VOLTAGE
+	voltageWas = 0;
+#endif
+
 }
 
 AnalogButtons::~AnalogButtons() {
@@ -19,7 +27,7 @@ AnalogButtons::~AnalogButtons() {
 }
 
 /*
-  Pins used by LCD & Keypad Shield:
+  Pins used by Freetronics LCD & Keypad Shield:
 
     A0: Buttons, analog input from voltage ladder
     D4: LCD bit 4
@@ -95,7 +103,66 @@ AnalogButtons AnalogButtons::read()
 
    //save the latest button value, for change event detection next time round
    buttonWas = button;
-   // voltageWas = buttonVoltage;
+#ifdef SHOW_VOLTAGE
+   voltageWas = buttonVoltage;
+#endif
 
    return *this;
+}
+
+/*--------------------------------------------------------------------------------------
+  getButtonVoltage()
+  Steps through button pressing to determine the correct voltage levels for each button
+--------------------------------------------------------------------------------------*/
+float AnalogButtons::getButtonVoltage() {
+	const float averagingRatio = 0.9;
+
+	unsigned int pinVoltage = analogRead( ADC_PIN );
+	float buttonVoltage;
+	unsigned int minVoltage = 1024, maxVoltage = 0;
+
+	// Detect onset of button pressing
+	while (pinVoltage > 1020)
+	   pinVoltage = analogRead( ADC_PIN );
+
+	Serial.print("First press: ");
+	Serial.println(pinVoltage);
+	buttonVoltage = pinVoltage;
+
+	// Average voltages while button being pressed
+	while (pinVoltage < 1020) {
+	   buttonVoltage = buttonVoltage*averagingRatio + pinVoltage*(1.0 - averagingRatio);
+	   minVoltage = min(minVoltage, pinVoltage);
+	   maxVoltage = max(maxVoltage, pinVoltage);
+	   pinVoltage = analogRead( ADC_PIN );
+	}
+
+	Serial.print(minVoltage);
+	Serial.print(" < ");
+	Serial.print(buttonVoltage, DEC);
+	Serial.print(" < ");
+	Serial.println(maxVoltage);
+
+	return buttonVoltage;
+}
+
+/*--------------------------------------------------------------------------------------
+  calibrate()
+  Steps through button pressing to determine the correct voltage levels for each button
+--------------------------------------------------------------------------------------*/
+void AnalogButtons::calibrate()
+{
+   unsigned int buttonVoltage;
+   byte button = BUTTON_NONE;   // return no button pressed if the below checks don't write to btn
+
+   Serial.print(F("Press 'Right' "));
+   getButtonVoltage();
+   Serial.print(F("'Up' "));
+   getButtonVoltage();
+   Serial.print(F("'Down' "));
+   getButtonVoltage();
+   Serial.print(F("'Left' "));
+   getButtonVoltage();
+   Serial.print(F("'Select' "));
+   getButtonVoltage();
 }

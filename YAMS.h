@@ -114,8 +114,8 @@ public:
 
 	virtual void activate();
 
-	void setLCD( LiquidCrystal l  );
-	void setKeypad( AnalogButtons k );
+	void setLCD( LiquidCrystal &l  );
+	void setKeypad( AnalogButtons &k );
 
 		// Menu construction
 	Menu &addChild( Menu &c);

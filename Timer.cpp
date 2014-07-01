@@ -43,11 +43,11 @@ private:
   } */
 
   void Timer::print() const {
-	  if (alarm == -1) {
+	  if (alarm == 0) {
 		  Serial.println(F("Not set"));
 		  return;
 	  }
-	  if (alarm >= 0 && (now() > alarm || (now() == alarm && millis()%1000 > alarm_ms))) {
+	  if (alarm > 0 && (now() > alarm || (now() == alarm && millis()%1000 > alarm_ms))) {
 		  Serial.println(F("Beep"));
 		  return;
 	  }
@@ -102,8 +102,8 @@ private:
   
   // Returns true if the alarm has gone off and clears the alarm if clear is true
   bool Timer::timeUp(bool clear) {
-    if (alarm >= 0 && (now() > alarm || (now() == alarm && millis()%1000 > alarm_ms))) {
-        if (clear) alarm = -1;
+    if (alarm > 0 && (now() > alarm || (now() == alarm && millis()%1000 > alarm_ms))) {
+        if (clear) alarm = 0;
         return true;
       } else
       return false;

@@ -91,7 +91,8 @@ float dailyMin[24]      = {50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50
 /*--------------------------------------------------------------------------------------
  * Init the analog button shield using pin A0
  */
-AnalogButtons keypad(BUTTON_ADC_PIN);
+// AnalogButtons keypad(BUTTON_ADC_PIN, 0, 145, 333, 505, 741);    // Freetronics
+AnalogButtons keypad(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
 
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
@@ -449,7 +450,7 @@ void loop(void) {
   
   Serial.println(keypad.getButtonJustPressed(), DEC);
 
-  // mm->activate();
+  mm->activate();
 }
 
 float readTemp() {

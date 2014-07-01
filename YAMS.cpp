@@ -94,25 +94,32 @@ Menu *Menu::back() {
 }
 
 void Menu::activate() {
-	lcd->setCursor(0,0);
-	lcd->print("Boo");
-	  Serial.println(freeRam());
+	if (lcd) {
+		lcd->setCursor(0,0);
+		lcd->print("Boo");
+	}
+	Serial.println(freeRam());
 	 showStructure(true);
 	//  Serial.println(freeRam());
 	
+	Menu *previous;
+
 	if (current)
 	do {
-    	Menu::LCDdisplay(*current);
+		if (previous != current) {
+			display(*current);
+			previous = current;
+		}
 
-		current = Menu::keypadProcInput(*current);
+		current = processInput(*current);
 	} while (current);   // NULL from process input means exit menu
 }
 
-void Menu::setLCD( LiquidCrystal l  ) {
+void Menu::setLCD( LiquidCrystal &l  ) {
 	lcd = &l;
 	display = &LCDdisplay;
 }
-void Menu::setKeypad( AnalogButtons k ) {
+void Menu::setKeypad( AnalogButtons &k ) {
 	keypad = &k;
 	processInput = &keypadProcInput;
 }
@@ -141,20 +148,21 @@ Menu *Menu::serialProcessInput(Menu &m) {
 void Menu::LCDdisplay(Menu &m) {
 	Serial.print(F("LCDdisplay: "));
 	Serial.println(m.name);
+
+	char text[17];
+	sprintf(text, "%-16s", m.name);   // Right pad name with spaces to force overwriting on LCD
+
 	lcd->setCursor(0, 0);
-	lcd->print(m.name);
+	lcd->print(text);
 }
 
 Menu *Menu::keypadProcInput(Menu &m) {
-  Serial.println(F("keypadProcInput"));
 	Timer menuTimeout(MENU_TIMEOUT);
+	while (keypad->getButtonJustPressed()) keypad->read();
 	do {
 		Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
 		keypad->read();
 	} while (keypad->getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
-
-  Serial.print(F("Button was "));
-  Serial.println(keypad->getButtonWas(), DEC);
 
 	switch (keypad->getButtonWas()) {
 	case BUTTON_UP: 	   return m.up();

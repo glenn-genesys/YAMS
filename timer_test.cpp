@@ -43,7 +43,7 @@ void resetTimers() {
 	if (t3) delete t3;
 	if (t4) delete t4;
 	t1 = new Timer(10);
-	t2 = new Timer(900);
+	t2 = new Timer(1390);
 	t3 = new Timer(1400);
 	t4 = new Timer(1990);
 }
@@ -68,9 +68,10 @@ void creationTests() {
 }
 
 void t_setup() {
+	Serial.begin(19200);
+
 	// Set time to 8:29:00am 14 May 2014
 	// setTime(8,29,0,14,5,14);
-	// setTime(8,29,0,16,6,14);
 	// Fails when time set -- need to investigate
 
 	delay(5000);
@@ -86,12 +87,14 @@ void t_setup() {
 	t3->print();
 	Serial.print("t4: ");
 	t4->print();
+
+	setTime(8,29,0,16,6,14);
 }
 
 
 
-void testTimer( Timer t ) {
-  if (t.timeUp(false)) Serial.print("expired");
+void testTimer( Timer *t ) {
+  if (t->timeUp(false)) Serial.print("expired");
 }
 
 void t_loop() {
@@ -101,6 +104,7 @@ void t_loop() {
 	Serial.print(" millis=");
 	Serial.println(millis(), DEC);
 	Serial.print("t1: ");
+	// testTimer(t1);
 	t1->print();
 	Serial.print("t2: ");
 	t2->print();
