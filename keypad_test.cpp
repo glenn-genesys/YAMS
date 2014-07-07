@@ -5,8 +5,8 @@
 /*--------------------------------------------------------------------------------------
  * Init the analog button shield using pin A0
  */
-// AnalogButtons button(BUTTON_ADC_PIN);
-AnalogButtons button(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
+// AnalogButtons button(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
+AnalogButtons button(BUTTON_ADC_PIN, AnalogButtons::OTHER);
 bool prevPressed = false;
 
 void k_setup() {

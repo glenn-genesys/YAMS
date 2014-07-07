@@ -22,10 +22,14 @@ private:
 	static menu *last;
 */
 
+// Memory allocation for static variables
+
 Menu *Menu::last;        // Single entry for back button
 Menu *Menu::current;     // Current menu location
 LiquidCrystal *Menu::lcd;
 AnalogButtons *Menu::keypad;
+Menu::InputType Menu::input;
+Menu::OutputType Menu::output;
 
 int freeRam () {
   extern int __heap_start, *__brkval;
@@ -35,13 +39,13 @@ int freeRam () {
 
 // Default input function is _input(). Default display method is _default()
 Menu::Menu(const char *n,
-		bool loop = false,
+		bool loop,
 		void (*dis)(Menu &m),
 		Menu* (*procin)(Menu &m),
 		char const (*in)(Menu &m)) {
 	name = n;
 	this->loop = loop;
-	input = in;
+	getInput = in;
 	processInput = procin;
 	display = dis;
 	Menu::current = this;
@@ -50,11 +54,41 @@ Menu::Menu(const char *n,
 
 Menu::Menu() {
 	name = NULL;
-	this->loop = loop;
-	input = NULL;
+	this->loop = false;
+	getInput = NULL;
 	processInput = NULL;
 	display = NULL;
 	parent = child = next = prev = NULL;
+}
+
+Menu::Menu(const char *n,
+       const bool loop,
+       const OutputType out,
+       const InputType  in) {
+	name = n;
+	this->loop = loop;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	input = in;
+	output = out;
+	Menu::current = this;
+	parent = child = next = prev = NULL;
+}
+
+Menu::Menu(const char *n,
+       const bool loop,
+       LiquidCrystal &l,
+       AnalogButtons &k) {
+	name = n;
+	this->loop = loop;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	Menu::current = this;
+	parent = child = next = prev = NULL;
+	setLCD(l);
+	setKeypad(k);
 }
 
 Menu::~Menu() {;}
@@ -94,85 +128,92 @@ Menu *Menu::back() {
 }
 
 void Menu::activate() {
-	if (lcd) {
-		lcd->setCursor(0,0);
-		lcd->print("Boo");
+	// Serial.println(freeRam());
+	// showStructure(true);
+	if (output == LCDOUT) {
+		lcd->clear();
 	}
-	Serial.println(freeRam());
-	 showStructure(true);
-	//  Serial.println(freeRam());
 	
 	Menu *previous;
 
-	if (current)
-	do {
-		if (previous != current) {
-			display(*current);
-			previous = current;
-		}
+	if (!current) current = (last ? last : this);
 
-		current = processInput(*current);
+	do {
+		if (output == SEROUT && previous != current) {
+			current->serialDisplay();
+		} else if (output == LCDOUT) {
+			current->LCDdisplay();
+		}
+		previous = current;
+
+		switch (input) {
+		case SERIN: { current = current->serialProcessInput(); break; }
+		case KEYIN: { current = current->keypadProcInput(); break; }
+		}
 	} while (current);   // NULL from process input means exit menu
+
+	current = previous;  // Remember where we were
 }
 
 void Menu::setLCD( LiquidCrystal &l  ) {
 	lcd = &l;
-	display = &LCDdisplay;
+	output = LCDOUT;
 }
 void Menu::setKeypad( AnalogButtons &k ) {
 	keypad = &k;
-	processInput = &keypadProcInput;
+	input = KEYIN;
 }
 
-void Menu::serialDisplay(Menu &m) {
-	Serial.println(m.name);
+void Menu::serialDisplay() {
+	Serial.println(name);
 }
 
-const char Menu::serialInput(Menu &m) {
+const char Menu::serialInput() {
 	return Serial.read();
 }
 
-Menu *Menu::serialProcessInput(Menu &m) {
-	switch (m.input(m)) {
-	case 'u': return m.up();
-	case 'd': return m.down();
-	case 'l': return m.left();
-	case 'r': return m.right();
-	case 's': return m.right();   // Select activates child menu, just like right
-	case 'b': return m.back();
+Menu *Menu::serialProcessInput() {
+	// switch (getInput(*this)) {
+	switch (serialInput()) {
+	case 'u': return up();
+	case 'd': return down();
+	case 'l': return left();
+	case 'r': return right();
+	case 's': return select();
+	case 'b': return back();
 	case 'q': return NULL;
-	default: return &m;
+	default: return this;
 	}
 }
 
-void Menu::LCDdisplay(Menu &m) {
-	Serial.print(F("LCDdisplay: "));
-	Serial.println(m.name);
+void Menu::LCDdisplay() {
+	// Serial.print(F("LCDdisplay: "));
+	// Serial.println(name);
 
 	char text[17];
-	sprintf(text, "%-16s", m.name);   // Right pad name with spaces to force overwriting on LCD
+	sprintf(text, "%-16s", name);   // Right pad name with spaces to force overwriting on LCD
 
 	lcd->setCursor(0, 0);
 	lcd->print(text);
 }
 
-Menu *Menu::keypadProcInput(Menu &m) {
+Menu *Menu::keypadProcInput() {
 	Timer menuTimeout(MENU_TIMEOUT);
 	while (keypad->getButtonJustPressed()) keypad->read();
 	do {
-		Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
+		// Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
 		keypad->read();
 	} while (keypad->getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
 
 	switch (keypad->getButtonWas()) {
-	case BUTTON_UP: 	   return m.up();
-	case BUTTON_DOWN: 	 return m.down();
-	case BUTTON_LEFT: 	 return m.left();
-	case BUTTON_RIGHT: 	 return m.right();
-	case BUTTON_SELECT: return m.right();   // Select activates child menu, just like right
+	case BUTTON_UP: 	return up();
+	case BUTTON_DOWN: 	return down();
+	case BUTTON_LEFT: 	return left();
+	case BUTTON_RIGHT: 	return right();
+	case BUTTON_SELECT: return select();
 	// case 'b': return m.back();
 	case BUTTON_NONE:   return NULL;
-	default: return &m;
+	default: return this;
 	}
 }
 
@@ -261,14 +302,13 @@ void Menu::showStructure(bool full) {
 // protected:
 //	int &value;
 //	bool selected = false;  // When MenuValue is selected, up and down adjust value
-
 MenuValue::MenuValue(const char *n,
 		  int v,
 		  void (*dis)(Menu &m),
 		  Menu* (*procin)(Menu &m),
 		  const char (*in)(Menu &m)) {
 	name = n;
-	input = in;
+	getInput = in;
 	processInput = procin;
 	display = dis;
 	current = this;
@@ -276,25 +316,40 @@ MenuValue::MenuValue(const char *n,
 	selected = false;
 }
 
-void MenuValue::v_display(Menu &mm) {
-	MenuValue &m = static_cast<MenuValue &>(mm);
-  if (m.selected) {
-	    Serial.print(F("Set ") );
-	    Serial.print(m.name);
-	    Serial.print(": ");
-	    Serial.println(m.value, DEC);
-  } else {
-	    Serial.print(m.name);
-	    Serial.print(" = ");
-	    Serial.println(m.value, DEC);
-  }
+MenuValue::MenuValue() {
+	name = NULL;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	current = this;
+	value = 0;
+	selected = false;
+}
+
+MenuValue::~MenuValue() {;}
+
+void MenuValue::LCDdisplay() {
+	lcd->setCursor(0, 0);
+	lcd->print(F("                "));     // Erase previous text
+	lcd->setCursor(0, 0);
+	if (selected) {
+		lcd->print(F("Set ") );
+		lcd->print(name);
+		lcd->print(": ");
+		lcd->print(value, 1);
+	} else {
+		lcd->print(name);
+		lcd->print(" = ");
+		lcd->print(value, 1);
+	}
+	lcd->print("   ");
 }
 
 Menu *MenuValue::up() {
 	if (!selected)
 		return getif(prev);
 	else {
-		value++;
+		value = min(4000, value+1);
 		return this;
 	}
 }
@@ -303,7 +358,7 @@ Menu *MenuValue::down() {
 	if (!selected)
 		return getif(next);
 	else {
-		value--;
+		value = max(0, value-1);
 		return this;
 	}
 }
@@ -320,10 +375,6 @@ Menu *MenuValue::left() {
 Menu *MenuValue::right() {
 	selected = true;
 	return this;
-}
-
-Menu *MenuValue::select() {
-	return right();    // Select is the same as right, by default
 }
 
 Menu *MenuValue::back() {
@@ -350,7 +401,7 @@ MenuArray::MenuArray(const char *n,
 		  Menu* (*procin)(Menu &m),
 		  const char (*in)(Menu &m)) {
 	name = n;
-	input = in;
+	getInput = in;
 	processInput = procin;
 	display = dis;
 	current = this;
@@ -358,6 +409,19 @@ MenuArray::MenuArray(const char *n,
 	index = 0;
 	selected = false;
 }
+
+MenuArray::MenuArray() {
+	name = NULL;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	current = NULL;
+	values = NULL;
+	index = 0;
+	selected = false;
+}
+
+MenuArray::~MenuArray() {;}
 
 Menu *MenuArray::up() {
   if (selected) {
@@ -377,8 +441,12 @@ Menu *MenuArray::down() {
 
 Menu *MenuArray::left() {
   if (selected) {
-    index = max(0, index-1);
-    return this;
+	  if (index == 0) {
+		  selected = false;
+	  } else {
+		index--;
+	  }
+	  return this;
   } else
     return getif(parent);
 }
@@ -387,28 +455,30 @@ Menu *MenuArray::right() {
   if (selected) {
     index = min(19, index+1);
     return this;
-  } else
-    return select();
-}
-
-void MenuArray::a_display(Menu &mm) {
-	MenuArray &m = static_cast<MenuArray &>(mm);
-     if (m.selected) {
-       m.lcd->setCursor(1,1);
-     m.lcd->setCursor(4, 1);
-     m.lcd->print(m.index + 1, DEC);
-     m.lcd->print("  ");    // Make sure previous value is overwritten
-     // Make sure set point is printed in the right place
-     m.lcd->setCursor(11, 1);
-     m.lcd->print(m.values[m.index], DEC);
-   } else {
-     m.lcd->setCursor(4, 1);
-     m.lcd->print(m.index + 1, DEC);
-     m.lcd->print("  ");    // Make sure previous value is overwritten
-
-     // Make sure set point is printed in the right place
-     m.lcd->setCursor(11, 1);
-     m.lcd->print(m.values[m.index], DEC);
+  } else {
+	selected = true;
+	return this;
    }
 }
+
+Menu *MenuArray::select() {
+	selected = !selected;
+	return this;
+}
+
+void MenuArray::LCDdisplay() {
+	lcd->home();
+	lcd->print(F("                "));     // Erase previous text
+	lcd->home();
+	if (selected) {
+		lcd->print(F("Day "));
+		lcd->print(index + 1, DEC);
+		lcd->print(F(" : "));
+		lcd->print(values[index], 1);
+		lcd->print(F("    "));
+	} else {
+		lcd->print(name);
+	}
+}
+
 

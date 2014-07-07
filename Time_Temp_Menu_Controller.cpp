@@ -87,12 +87,15 @@ float hourlyMax[24]     = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 float hourlyMin[24]     = {50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 float dailyMax[24]      = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 float dailyMin[24]      = {50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
+float hourlyPower = 0;
+float totalPower = 0;
 
 /*--------------------------------------------------------------------------------------
  * Init the analog button shield using pin A0
  */
 // AnalogButtons keypad(BUTTON_ADC_PIN, 0, 145, 333, 505, 741);    // Freetronics
-AnalogButtons keypad(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
+// AnalogButtons keypad(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
+AnalogButtons keypad(BUTTON_ADC_PIN, AnalogButtons::OTHER);        // Other one
 
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
@@ -105,7 +108,7 @@ LiquidCrystal lcd( 8, 9, 4, 5, 6, 7 );   //Pins for the freetronics 16x2 LCD shi
 OneWire  ds(2);  // on pin 2 (a 4.7K resistor is necessary)
 
 //beneath is list of menu items needed to build the menu
-char *daySt = "Days";
+/* char *daySt = "Days";
 char *hrStr = "Hours";
 char *runStr = "Get/Set Runtime";
 char *schedStr = "Schedule";
@@ -116,12 +119,30 @@ MenuValue *runDays      = new MenuValue(daySt, 0);
 MenuValue *runHours     = new MenuValue(hrStr, 0);
 
 // Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
-Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);
+Menu *runningTime       = new Menu(runStr, true);
 
 MenuArray *scheduleMenu = new MenuArray(schedStr, schedule);
 
 // Menu mm = Menu(mainStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
-Menu *mm = new Menu(mainStr, false, &Menu::LCDdisplay, &Menu::keypadProcInput);
+Menu *mm = new Menu(mainStr, false, Menu::LCDOUT, Menu::KEYIN);
+*/
+
+//beneath is list of menu items needed to build the menu
+char *daySt = "Days";
+char *hrStr = "Hours";
+char *runStr = "Get/Set Runtime";
+char *schedStr = "Schedule";
+char *mainStr = "Main Menu";
+
+// By default, value enters a submenu to increment/decrement the value, on select
+MenuValue *runDays      = new MenuValue("Days", 0);
+MenuValue *runHours     = new MenuValue("Hours", 0);
+
+Menu *runningTime       = new Menu("Get/Set Runtime", true);
+
+MenuArray *scheduleMenu = new MenuArray("Schedule", schedule);
+
+Menu *mm = new Menu(mainStr, false, lcd, keypad);
 
 /*    MenuItem review         = MenuItem(menu, "Review", 2);
       MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
@@ -167,17 +188,20 @@ void setup(void) {
    // Menu setup
     /*
     Menu:
-    Running time
-    -> Days  +/-
-    -> Hours +/-
-    Schedule
-    -> Day 0 +/-
-    etc
     Review
-    -> Daily review  (replay min/max/set each day, cycle every 3 sec, disable time-out)
-    -> Hourly review (replay min/max each hour, cycle every 2 sec, disable time-out)
+    -> Daily review  (replay min/max/set/duty cycle each day, cycle every 3 sec, disable time-out)
+    -> Hourly review (replay min/max/duty cycle each hour, cycle every 2 sec, disable time-out)
     Appliance  Heater/Cooler
-    Mode       Schedule/Fixed
+    Mode       Set point/Preset Schedule (Lager, Cider, ??)
+    Configure
+    -->Adjust setpoint
+    -->Adjust schedule offset
+    -->Running time
+      -> Days  +/-
+      -> Hours +/-
+      Schedule
+      -> Day 0 +/-
+      etc
     */
 
    Alarm.delay(2000);
@@ -364,9 +388,8 @@ void normalDisplay() {
    // Serial.println("Normal display");
    lcd.setCursor( 0, 0 );   //top left
 
-   lcd.print(smoothedTemp, 2);
-   // Overwrite from fourth decimal place
-   // lcd.setCursor( 6, 0 );
+   lcd.print(smoothedTemp, 2);   // Print with 2 decimal places
+
    lcd.print("C /  ");
    lcd.print(setPoint, 2);
    lcd.print("C");
@@ -526,6 +549,8 @@ void updateTemp() {
    }
 
    setPoint = schedule[day() - 1];
+
+   hourlyPower += (applianceOn ? 1 : 0);
 
    hourlyMax[runHours->getValue()] = max(hourlyMax[runHours->getValue()], smoothedTemp);
    hourlyMin[runHours->getValue()] = min(hourlyMin[runHours->getValue()], smoothedTemp);

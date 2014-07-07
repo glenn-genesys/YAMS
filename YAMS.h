@@ -48,7 +48,21 @@
 extern "C" {
 #endif
 
+/* Define a common interface for displays
+ * But this sucks because it means we can't use the capabilities of each display
+ * such as a 2-line LCD, or serial output, in the best way for ecah display.
+class MenuDisplay {
+public:
+  virtual print(char *message);
+  virtual println(char *message);
+  virtual clear();
+} */
+
 class Menu {
+public:
+	enum OutputType {SEROUT, LCDOUT};
+	enum InputType  {SERIN, KEYIN};
+
 protected:
 	const char *name;
 	// Variables that hold the data structure of menu connections
@@ -61,44 +75,44 @@ protected:
 	static Menu *last;        // Single entry for back button
 	static Menu *current;     // Current menu location
 
-  // Functions pointers
+  // Function pointers
 	void  (*display)(Menu &m); // Function pointer to display method
 	Menu* (*processInput)(Menu &m);  // Function pointer to input interpreter
-	char const (*input)(Menu &m);   // Function pointer to blocking or non-blocking input function
+	char const (*getInput)(Menu &m);   // Function pointer to blocking or non-blocking input function
+
+	static OutputType output;
+	static InputType input;
 
 	static LiquidCrystal *lcd;
 	static AnalogButtons *keypad;
 
-	/* static void serialDisplay(Menu &m);   // Default display method
-	static void lcdDisplay(Menu &m);
-	static char serialInput(Menu &m);     // Default non-blocking function to get input
-	static Menu *serialProcessInput(Menu &m); // Default input interpreter
-  	static Menu *keypadProcInput(Menu &m);
-	 */
-
 	Menu *getif(Menu *t);
 
 public:
-	// Default implementations
-	static void  serialDisplay(Menu &m);
-	static Menu* serialProcessInput(Menu &m); // Default input interpreter
-	static const char  serialInput(Menu &m);     // Default non-blocking function to get input
+	// Standard input and output methods
+	virtual void serialDisplay();
+	virtual void LCDdisplay();
 
-	static void LCDdisplay(Menu &m);
-	static Menu *keypadProcInput(Menu &m);
+	virtual Menu *serialProcessInput();
+	virtual Menu *keypadProcInput();
+
+	virtual const char  serialInput();
 
 	Menu(const char *n,
 		 bool loop,
-		 void (*dis)(Menu &m) = serialDisplay,
-		 Menu* (*procin)(Menu &m) = serialProcessInput,
-		 const char (*in)(Menu &m) = serialInput);
+		 void (*dis)(Menu &m) = NULL,
+		 Menu* (*procin)(Menu &m) = NULL,
+		 const char (*in)(Menu &m) = NULL);
 
-  /* Menu(const char *n,
+    Menu(const char *n,
        const bool loop,
-       const io   parts);
+       const OutputType out,
+       const InputType  in);
 
-	enum io;
-   */
+    Menu(const char *n,
+		const bool loop,
+		LiquidCrystal &l,
+		AnalogButtons &k);
 
 	Menu();
 
@@ -132,20 +146,29 @@ protected:
 public:
 	MenuValue(const char *n,
 			  int v,
-			  void (*dis)(Menu &m) = v_display,
-			  Menu* (*procin)(Menu &m) = serialProcessInput,
-			  const char (*in)(Menu &m) = serialInput);
+				 void (*dis)(Menu &m) = NULL,
+				 Menu* (*procin)(Menu &m) = NULL,
+				 const char (*in)(Menu &m) = NULL);
+
+	MenuValue();
+	virtual ~MenuValue();
 
 	int getValue();
 	void setValue(int v);
 
-	static void v_display(Menu &mm);
+	// void serialDisplay();
+	void LCDdisplay();
+
+	// Menu *serialProcessInput();
+	// Menu *keypadProcInput();
+
+	// const char  serialInput();
 
 	Menu *left();
 	Menu *right();
 	Menu *up();
 	Menu *down();
-	Menu *select();
+	// Menu *select();
 	Menu *back();
 };
 
@@ -158,17 +181,26 @@ protected:
 public:
   MenuArray(const char *n,
 		  float vs[],
-		  void (*dis)(Menu &m) = a_display,
-		  Menu* (*procin)(Menu &m) = serialProcessInput,
-		  const char (*in)(Menu &m) = serialInput);
+			 void (*dis)(Menu &m) = NULL,
+			 Menu* (*procin)(Menu &m) = NULL,
+			 const char (*in)(Menu &m) = NULL);
 
-	static void a_display(Menu &mm);
+  MenuArray();
+  virtual ~MenuArray();
+
+  // void serialDisplay();
+	void LCDdisplay();
+
+	// Menu *serialProcessInput();
+	// Menu *keypadProcInput();
+
+	// const char  serialInput();
 
 	Menu *left();
 	Menu *right();
 	Menu *up();
 	Menu *down();
-	// Menu *select();
+	Menu *select();
 	// Menu *back();
 };
 

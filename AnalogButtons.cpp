@@ -9,7 +9,7 @@
 
 // AnalogButtons(A0, 0, 145, 333, 505, 741)    Freetronics   
 // AnalogButtons(A0, 0, 98, 252, 407, 637)     Other one
-AnalogButtons::AnalogButtons(byte pin, int rv=0, int uv=145, int dv=333, int lv=505, int sv=741):
+/* AnalogButtons::AnalogButtons(byte pin, int rv=0, int uv=145, int dv=333, int lv=505, int sv=741):
 	RIGHT_10BIT_ADC(rv), UP_10BIT_ADC(uv), DOWN_10BIT_ADC(dv), LEFT_10BIT_ADC(lv), SELECT_10BIT_ADC(sv)
  {
 	ADC_PIN = pin;
@@ -19,7 +19,20 @@ AnalogButtons::AnalogButtons(byte pin, int rv=0, int uv=145, int dv=333, int lv=
 #ifdef SHOW_VOLTAGE
 	voltageWas = 0;
 #endif
+  } */
 
+AnalogButtons::AnalogButtons(byte pin, Model m) {
+  switch (m) {
+    case FREETRONICS: { init(0, 145, 333, 505, 741); break; }
+    case OTHER:       { init(0, 98, 252, 407, 637);  break; }
+  }
+	ADC_PIN = pin;
+	buttonJustPressed  = false;
+	buttonJustReleased = false;
+	buttonWas          = BUTTON_NONE;
+#ifdef SHOW_VOLTAGE
+	voltageWas = 0;
+#endif
 }
 
 AnalogButtons::~AnalogButtons() {
@@ -46,6 +59,14 @@ AnalogButtons::~AnalogButtons() {
     LEFT:   2.47V : 126 @ 8bit ; 505 @ 10 bit
     SELECT: 3.62V : 185 @ 8bit ; 741 @ 10 bit
 */
+
+void AnalogButtons::init(int rv, int uv, int dv, int lv, int sv) {
+  RIGHT_10BIT_ADC = rv;
+  UP_10BIT_ADC = uv;
+  DOWN_10BIT_ADC = dv;
+  LEFT_10BIT_ADC = lv;
+  SELECT_10BIT_ADC = sv;
+}
 
 byte AnalogButtons::getButtonWas() { return buttonWas; }
 bool AnalogButtons::getButtonJustPressed() { return buttonJustPressed; }

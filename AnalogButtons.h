@@ -43,18 +43,24 @@ private:
 	byte buttonJustReleased;    //this will be true after a ReadButtons() call if triggered
 	byte buttonWas;             //used by ReadButtons() for detection of button events
 
-  const int RIGHT_10BIT_ADC;
-  const int UP_10BIT_ADC;
-  const int DOWN_10BIT_ADC;
-  const int LEFT_10BIT_ADC;
-  const int SELECT_10BIT_ADC;
+  int RIGHT_10BIT_ADC;
+  int UP_10BIT_ADC;
+  int DOWN_10BIT_ADC;
+  int LEFT_10BIT_ADC;
+  int SELECT_10BIT_ADC;
 
 public:
 #ifdef SHOW_VOLTAGE
 	unsigned int voltageWas; // Useful for debugging
 #endif
+
+	enum Model {FREETRONICS, OTHER};
+
 	AnalogButtons(byte pin, int rv, int uv, int dv, int lv, int sv);
+	AnalogButtons(byte pin, Model m);
 	virtual ~AnalogButtons();
+
+	void init(int rv, int uv, int dv, int lv, int sv);
 
 	// Non-blocking test of the current button state
 	AnalogButtons read();
