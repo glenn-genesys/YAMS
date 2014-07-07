@@ -78,8 +78,8 @@ char *mainStr1 = "Main Menu";
 
 float t_schedule[20]      = {19, 19, 19.5, 20, 20, 20.5, 21, 21.5, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23};
 
-  MenuValue *t_runDays      = new MenuValue(daySt1, 0);
-  MenuValue *t_runHours     = new MenuValue(hrStr1, 0);
+  MenuValue *t_runDays      = new MenuValue(daySt1, 0, -5, 30);
+  MenuValue *t_runHours     = new MenuValue(hrStr1, 0, 0, 23);
   
   // Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
   // Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);
@@ -101,8 +101,8 @@ void globalMenu() {
 }
 
 void localMenu() {
-	  MenuValue t_runDays      = MenuValue("Days", 0);
-	  MenuValue t_runHours     = MenuValue("Hours", 0);
+	  MenuValue t_runDays      = MenuValue("Days", 1, 1, 30);
+	  MenuValue t_runHours     = MenuValue("Hours", 1, 1, 24);
 
 	  // Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
 	  // Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);

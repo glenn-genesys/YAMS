@@ -140,12 +140,14 @@ public:
 
 class MenuValue : public Menu {
 protected:
-	int value;
+	int value, minv, maxv;
 	bool selected;  // When MenuValue is selected, up and down adjust value
 
 public:
 	MenuValue(const char *n,
-			  int v,
+			  int val,
+			  int lowerbound,
+			  int upperbound,
 				 void (*dis)(Menu &m) = NULL,
 				 Menu* (*procin)(Menu &m) = NULL,
 				 const char (*in)(Menu &m) = NULL);

@@ -8,17 +8,20 @@ After 5 s returns to normal display and normal running. During menu access don't
 Button press returns to menu view -- wherever menu was, unless menu was last activated over 60 seconds ago
 
 Menu:
-Running time
--> Days  +/-
--> Hours +/-
-Schedule
--> Day 0 +/-
-etc
 Review
--> Daily review  (replay min/max/set each day, cycle every 3 sec, disable time-out)
--> Hourly review (replay min/max each hour, cycle every 2 sec, disable time-out)
+-> Daily review  (replay min/max/set/duty cycle each day, cycle every 3 sec, disable time-out)
+-> Hourly review (replay min/max/duty cycle each hour, cycle every 2 sec, disable time-out)
 Appliance  Heater/Cooler
-Mode       Schedule/Fixed
+Mode       Set point/Preset Schedule (Lager, Cider, ??)
+Configure
+-->Adjust setpoint
+-->Adjust schedule offset
+-->Running time
+  -> Days  +/-
+  -> Hours +/-
+  Schedule
+  -> Day 0 +/-
+  etc
 
 While running, record history of temperatures, min and max per hour
 
@@ -107,42 +110,15 @@ LiquidCrystal lcd( 8, 9, 4, 5, 6, 7 );   //Pins for the freetronics 16x2 LCD shi
 --------------------------------------------------------------------------------------*/
 OneWire  ds(2);  // on pin 2 (a 4.7K resistor is necessary)
 
-//beneath is list of menu items needed to build the menu
-/* char *daySt = "Days";
-char *hrStr = "Hours";
-char *runStr = "Get/Set Runtime";
-char *schedStr = "Schedule";
-char *mainStr = "Main Menu";
-
 // By default, value enters a submenu to increment/decrement the value, on select
-MenuValue *runDays      = new MenuValue(daySt, 0);
-MenuValue *runHours     = new MenuValue(hrStr, 0);
-
-// Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
-Menu *runningTime       = new Menu(runStr, true);
-
-MenuArray *scheduleMenu = new MenuArray(schedStr, schedule);
-
-// Menu mm = Menu(mainStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
-Menu *mm = new Menu(mainStr, false, Menu::LCDOUT, Menu::KEYIN);
-*/
-
-//beneath is list of menu items needed to build the menu
-char *daySt = "Days";
-char *hrStr = "Hours";
-char *runStr = "Get/Set Runtime";
-char *schedStr = "Schedule";
-char *mainStr = "Main Menu";
-
-// By default, value enters a submenu to increment/decrement the value, on select
-MenuValue *runDays      = new MenuValue("Days", 0);
-MenuValue *runHours     = new MenuValue("Hours", 0);
+MenuValue *runDays      = new MenuValue("Days", 1, 1, 20);
+MenuValue *runHours     = new MenuValue("Hours", 1, 1, 24);
 
 Menu *runningTime       = new Menu("Get/Set Runtime", true);
 
 MenuArray *scheduleMenu = new MenuArray("Schedule", schedule);
 
-Menu *mm = new Menu(mainStr, false, lcd, keypad);
+Menu *mm = new Menu("Main Menu", false, lcd, keypad);
 
 /*    MenuItem review         = MenuItem(menu, "Review", 2);
       MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
@@ -156,6 +132,8 @@ Menu *mm = new Menu(mainStr, false, lcd, keypad);
 // Forward declarations
 void normalDisplay();
 void updateTemp();
+void every5s();
+void onTheHour();
 
 /*--------------------------------------------------------------------------------------
   setup()
@@ -175,12 +153,13 @@ void setup(void) {
 
    // Set time to 8:29:00am 14 May 2014
    // setTime(8,29,0,14,5,14);
-   setTime(9,50,0,2,7,14);
+   setTime(9,59,0,2,7,14);
 
    // Initialise temperature sensor
    updateTemp();
    Alarm.timerRepeat(1, updateTemp);            // read temperature every second
-   // Alarm.timerRepeat(3600, updateTempHistory);  // record hourly and daily maxima and minima
+   Alarm.timerRepeat(5, every5s);               // update setpoint and hourly power usage
+   Alarm.alarmOnce((hour()+1) % 24, 0, 0, onTheHour);  // record daily maxima and minima
 
    //set up the LCD number of columns and rows: 
    lcd.begin( 16, 2 );
@@ -225,116 +204,6 @@ void setup(void) {
 
    normalDisplay();
 }
-
-/*--------------------------------------------------------------------------------------
-  loop()
-  Arduino main loop
---------------------------------------------------------------------------------------*/
-/* void loop(void) {
-  float reading;
-
-  runTime = Time(millis());
-
-  // Current set point depends on the schedule
-  setPoint = schedule[runTime.days];
-
-  // Read temperature every second, but don't slow down button reading loop
-  if (runTime.secs != lastUpdate) {
-    reading = readTemp();
-
-    smoothedTemp = smoothedTemp * (1 - AVERAGE_WEIGHT) + reading * AVERAGE_WEIGHT;
-
-    // Select button should swap between schedule and operational view
-
-    if (showSmoothed) {
-      lcd.setCursor(0, 0);
-      lcd.print("Smoothed : ");
-      lcd.print(smoothedTemp, DEC);
-    } else {
-      lcd.setCursor(0, 0);
-      lcd.print("Current  : ");
-      
-      lcd.print(reading, DEC);
-    }
-
-    // Make sure we don't thrash -- ensure at least two minutes have passed
-    if (coolingOn != smoothedTemp > setPoint && lastSwitch + RESWITCH_TIME < millis()/1000) {
-      // Switch on or off
-      Serial.println("Cooling " + coolingOn);
-      Serial.print("Last switch ");
-      Serial.println(lastSwitch, DEC);
-
-      coolingOn = smoothedTemp > setPoint;
-
-      lastSwitch = millis()/1000;
-    }
-
-    if (coolingOn) {
-        digitalWrite( CONTROL_PIN, HIGH );
-        digitalWrite( LCD_BACKLIGHT_PIN, LOW );
-        delay( 10 );
-        digitalWrite( LCD_BACKLIGHT_PIN, HIGH );   //leave the backlight on at exit
-    } else {
-      digitalWrite( CONTROL_PIN, LOW );
-    }
-    
-    Serial.println(runTime.secs, DEC);
-    
-    lastUpdate = runTime.secs;
-  }
-  
-   button.read();
-
-   if (button.buttonJustPressed) {
-     //show text label for the button pressed
-     switch( button.buttonWas )
-     {
-        case BUTTON_NONE:
-        {
-           break;
-        }
-        case BUTTON_UP:
-        {
-           schedule[menuDay] += 0.5;
-           break;
-        }
-        case BUTTON_DOWN:
-        {
-           schedule[menuDay] -= 0.5;
-           break;
-        }
-        case BUTTON_LEFT:
-        {
-           menuDay = max(menuDay - 1, 0);
-          break;
-        }
-        case BUTTON_RIGHT:
-        {
-           menuDay = min(menuDay + 1, 19);
-           break;
-        }
-       case BUTTON_SELECT:
-       {
-         showSmoothed = !showSmoothed;
-         break;
-        }
-        default:
-       {
-          break;
-       }
-     }
-     lcd.setCursor(4, 1);
-     lcd.print(menuDay + 1, DEC);
-     lcd.print("  ");    // Make sure previous value is overwritten
-
-     // Make sure set point is printed in the right place
-     lcd.setCursor(11, 1);
-     lcd.print(schedule[menuDay], DEC);
-     
-     delay(300);
-   }
-
-} */
 
 void alarm(int alarmType) {
   if (NO_ALARMS) return;
@@ -397,7 +266,7 @@ void normalDisplay() {
    lcd.setCursor( 0, 1 );   //bottom left
 
    char tempStr[16];
-   sprintf(tempStr, "Day %02d %02d:%02d:%02d", day(), hour(), minute(), second());
+   sprintf(tempStr, "Day %02d %02d:%02d:%02d", runDays->getValue(), hour(), minute(), second());
 
    lcd.print(tempStr);
 }
@@ -547,17 +416,31 @@ void updateTemp() {
    if (temperature != 0.0 && temperature < 85.0) {
 	   smoothedTemp = smoothedTemp * (1 - AVERAGE_WEIGHT) + temperature * AVERAGE_WEIGHT;
    }
-
-   setPoint = schedule[day() - 1];
-
-   hourlyPower += (applianceOn ? 1 : 0);
-
-   hourlyMax[runHours->getValue()] = max(hourlyMax[runHours->getValue()], smoothedTemp);
-   hourlyMin[runHours->getValue()] = min(hourlyMin[runHours->getValue()], smoothedTemp);
-   dailyMax[runDays->getValue()]   = max(dailyMax[runDays->getValue()], smoothedTemp);
-   dailyMin[runDays->getValue()]   = min(dailyMin[runDays->getValue()], smoothedTemp);
 }
 
-void updateRuntime() {
-   
+void every5s() {
+	Serial.println(F("5s"));
+   setPoint = schedule[runDays->getValue() - 1];
+
+   hourlyPower += (applianceOn ? 5.0 : 0.0);
+
+   int hours = runHours->getValue();
+   hourlyMax[hours] = max(hourlyMax[hours], smoothedTemp);
+   hourlyMin[hours] = min(hourlyMin[hours], smoothedTemp);
+}
+
+void onTheHour() {
+	Serial.println(F("on the hour"));
+	int hours = runHours->getValue();
+	int days  = runDays->getValue();
+
+	dailyMax[days]   = max(dailyMax[days], hourlyMax[hours]);
+	dailyMin[days]   = min(dailyMin[days], hourlyMin[hours]);
+
+	// Update runtime
+	runHours->setValue((hours % 24) + 1);
+	runDays->setValue( days + (hours == 24 ? 1 : 0));
+
+   // Reset this alarm
+   Alarm.alarmOnce((hour()+1) % 24, 0, 0, onTheHour);
 }

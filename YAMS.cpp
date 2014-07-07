@@ -304,6 +304,8 @@ void Menu::showStructure(bool full) {
 //	bool selected = false;  // When MenuValue is selected, up and down adjust value
 MenuValue::MenuValue(const char *n,
 		  int v,
+		  int lb,
+		  int ub,
 		  void (*dis)(Menu &m),
 		  Menu* (*procin)(Menu &m),
 		  const char (*in)(Menu &m)) {
@@ -313,6 +315,8 @@ MenuValue::MenuValue(const char *n,
 	display = dis;
 	current = this;
 	value = v;
+	minv = lb;
+	maxv = ub;
 	selected = false;
 }
 
@@ -322,7 +326,7 @@ MenuValue::MenuValue() {
 	processInput = NULL;
 	display = NULL;
 	current = this;
-	value = 0;
+	value = minv = maxv = 0;
 	selected = false;
 }
 
@@ -349,7 +353,7 @@ Menu *MenuValue::up() {
 	if (!selected)
 		return getif(prev);
 	else {
-		value = min(4000, value+1);
+		value = min(maxv, value+1);
 		return this;
 	}
 }
@@ -358,7 +362,7 @@ Menu *MenuValue::down() {
 	if (!selected)
 		return getif(next);
 	else {
-		value = max(0, value-1);
+		value = max(minv, value-1);
 		return this;
 	}
 }
