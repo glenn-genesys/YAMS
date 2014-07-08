@@ -177,12 +177,14 @@ public:
 class MenuArray : public Menu {
 protected:
   float *values;
+  int length;
   bool  selected;
   int index;
   
 public:
   MenuArray(const char *n,
 		  float vs[],
+		  int len,
 			 void (*dis)(Menu &m) = NULL,
 			 Menu* (*procin)(Menu &m) = NULL,
 			 const char (*in)(Menu &m) = NULL);
@@ -205,6 +207,47 @@ public:
 	Menu *select();
 	// Menu *back();
 };
+
+class MenuList : public Menu {
+protected:
+	const char ** values;
+	int length;
+	int selectedIndex;
+	bool selected;  // When MenuList is selected, up and down cycle through values
+
+public:
+	 MenuList (const char *n,
+    		   const char * vs[],
+    		   const int index,
+    			  int len,
+				  void (*dis)(Menu &m) = NULL,
+				  Menu* (*procin)(Menu &m) = NULL,
+				  const char (*in)(Menu &m) = NULL);
+
+	 MenuList ();
+	virtual ~ MenuList ();
+
+	const char *getValue();
+
+	void setIndex(int index);
+	int getIndex();
+
+	// void serialDisplay();
+	void LCDdisplay();
+
+	// Menu *serialProcessInput();
+	// Menu *keypadProcInput();
+
+	// const char  serialInput();
+
+	Menu *left();
+	Menu *right();
+	Menu *up();
+	Menu *down();
+	// Menu *select();
+	Menu *back();
+};
+
 
 #ifdef __cplusplus
 } // extern "C"

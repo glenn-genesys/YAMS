@@ -55,8 +55,8 @@ While running, record history of temperatures, min and max per hour
 #define CONTROL_PIN               0  // D0 turns on power relay
 #define BUZZER_PIN                11 // Piezo buzzer
 
-#define AVERAGE_WEIGHT            0.1 // For use when calculating moving average
-#define RESWITCH_TIME             10  // 120s Minimum time between power cycling (10 for testing)
+#define AVERAGE_WEIGHT            0.05 // For use when calculating moving average
+#define RESWITCH_TIME             120  // 120s Minimum time between power cycling (10 for testing)
 // Error codes
 #define NO_SENSOR                 1    // No or unexpected 1-wire temperature sensor connected
 #define SETPOINT_TOO_HIGH_LOW     2    // Can't reach setpoint. Too high (heating) or low (cooling).
@@ -72,6 +72,8 @@ While running, record history of temperatures, min and max per hour
 #define LCD_BACKLIGHT_ON()      digitalWrite( LCD_BACKLIGHT_PIN, HIGH )
 #define LCD_BACKLIGHT(state)    { if( state ){digitalWrite( LCD_BACKLIGHT_PIN, HIGH );}else{digitalWrite( LCD_BACKLIGHT_PIN, LOW );} }
 
+#define coolingMode (appMode->getIndex() == 1)
+
 // DS1822 22 4A 34 1C 0 0 0 9E
 /*--------------------------------------------------------------------------------------
   Global Variables
@@ -80,7 +82,6 @@ float temperature;
 float smoothedTemp      = 20;
 float setPoint          = 21.5;            // set point temp in degrees C
 boolean recentlySwitched= false;
-boolean coolingMode     = true;
 boolean applianceOn     = false;
 
 boolean showSmoothed    = true;
@@ -110,13 +111,19 @@ LiquidCrystal lcd( 8, 9, 4, 5, 6, 7 );   //Pins for the freetronics 16x2 LCD shi
 --------------------------------------------------------------------------------------*/
 OneWire  ds(2);  // on pin 2 (a 4.7K resistor is necessary)
 
+const char *heatStr = "Heating";
+const char *coolStr = "Cooling";
+const char *applianceMode[] = {heatStr, coolStr};
+
+MenuList *appMode = new MenuList("Appliance", applianceMode, 2, 1);
+
 // By default, value enters a submenu to increment/decrement the value, on select
 MenuValue *runDays      = new MenuValue("Days", 1, 1, 20);
 MenuValue *runHours     = new MenuValue("Hours", 1, 1, 24);
 
 Menu *runningTime       = new Menu("Get/Set Runtime", true);
 
-MenuArray *scheduleMenu = new MenuArray("Schedule", schedule);
+MenuArray *scheduleMenu = new MenuArray("Schedule", schedule, 20);
 
 Menu *mm = new Menu("Main Menu", false, lcd, keypad);
 
@@ -153,7 +160,7 @@ void setup(void) {
 
    // Set time to 8:29:00am 14 May 2014
    // setTime(8,29,0,14,5,14);
-   setTime(9,59,0,2,7,14);
+   setTime(23,59,0,2,7,14);
 
    // Initialise temperature sensor
    updateTemp();
@@ -186,13 +193,13 @@ void setup(void) {
    Alarm.delay(2000);
 
    runningTime->addChild( *runDays ).addChild( *runHours );
-   mm->addChild( *runningTime ).addChild( *scheduleMenu );
+   mm->addChild( *appMode ).addChild( *runningTime ).addChild( *scheduleMenu );
 
    mm->setLCD(lcd);
    mm->setKeypad(keypad);
 
    lcd.setCursor(0, 0);
-   if (coolingMode) {
+   if (coolingMode) {           // cooling Mode
 	   lcd.print(F("Cooling"));
 	   Serial.print(F("Cooling"));
    } else {

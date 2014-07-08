@@ -187,14 +187,10 @@ Menu *Menu::serialProcessInput() {
 }
 
 void Menu::LCDdisplay() {
-	// Serial.print(F("LCDdisplay: "));
-	// Serial.println(name);
-
-	char text[17];
-	sprintf(text, "%-16s", name);   // Right pad name with spaces to force overwriting on LCD
+	lcd->clear();
 
 	lcd->setCursor(0, 0);
-	lcd->print(text);
+	lcd->print(name);
 }
 
 Menu *Menu::keypadProcInput() {
@@ -333,9 +329,7 @@ MenuValue::MenuValue() {
 MenuValue::~MenuValue() {;}
 
 void MenuValue::LCDdisplay() {
-	lcd->setCursor(0, 0);
-	lcd->print(F("                "));     // Erase previous text
-	lcd->setCursor(0, 0);
+	lcd->clear();
 	if (selected) {
 		lcd->print(F("Set ") );
 		lcd->print(name);
@@ -401,6 +395,7 @@ protected:
 
 MenuArray::MenuArray(const char *n,
 		  float vs[],
+		  int len,
 		  void (*dis)(Menu &m),
 		  Menu* (*procin)(Menu &m),
 		  const char (*in)(Menu &m)) {
@@ -410,6 +405,7 @@ MenuArray::MenuArray(const char *n,
 	display = dis;
 	current = this;
 	values = vs;
+	length = len;
 	index = 0;
 	selected = false;
 }
@@ -421,7 +417,7 @@ MenuArray::MenuArray() {
 	display = NULL;
 	current = NULL;
 	values = NULL;
-	index = 0;
+	length = index = 0;
 	selected = false;
 }
 
@@ -448,7 +444,7 @@ Menu *MenuArray::left() {
 	  if (index == 0) {
 		  selected = false;
 	  } else {
-		index--;
+	    index = max(0, index-1);
 	  }
 	  return this;
   } else
@@ -457,7 +453,7 @@ Menu *MenuArray::left() {
 
 Menu *MenuArray::right() {
   if (selected) {
-    index = min(19, index+1);
+    index = min(length-1, index+1);
     return this;
   } else {
 	selected = true;
@@ -471,9 +467,7 @@ Menu *MenuArray::select() {
 }
 
 void MenuArray::LCDdisplay() {
-	lcd->home();
-	lcd->print(F("                "));     // Erase previous text
-	lcd->home();
+	lcd->clear();
 	if (selected) {
 		lcd->print(F("Day "));
 		lcd->print(index + 1, DEC);
@@ -484,5 +478,112 @@ void MenuArray::LCDdisplay() {
 		lcd->print(name);
 	}
 }
+
+/* class MenuList : public Menu {
+protected:
+	Vector<char *> values;
+	int selectedIndex;
+	bool selected;  // When MenuList is selected, up and down cycle through values
+*/
+MenuList::MenuList (const char *n,
+    			  const char * vs[],
+    			  int len,
+    			  int defaultIndex,
+				  void (*dis)(Menu &m),
+				  Menu* (*procin)(Menu &m),
+				  const char (*in)(Menu &m)) {
+	name = n;	
+	getInput = in;
+	processInput = procin;
+	display = dis;
+	current = this;
+	values = vs;
+	length = len;
+	selectedIndex = defaultIndex;
+	selected = false;
+}
+
+MenuList::MenuList() {
+	name = NULL;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	current = this;
+	values = NULL;
+	length = selectedIndex = 0;
+	selected = false;
+}
+
+MenuList::~MenuList() {;}
+
+void MenuList::LCDdisplay() {
+	lcd->clear();
+	if (selected) {
+		lcd->print(F("Set ") );
+		lcd->print(name);
+		lcd->print(": ");
+		lcd->setCursor(1, 1);
+		lcd->print(values[selectedIndex]);
+	} else {
+		lcd->print(name);
+		lcd->print(" = ");
+		lcd->setCursor(1, 1);
+		lcd->print(values[selectedIndex]);
+	}
+}
+
+Menu *MenuList::up() {
+	if (!selected)
+		return getif(prev);
+	else {
+		selectedIndex = (selectedIndex + 1) % length;
+		return this;
+	}
+}
+
+Menu *MenuList::down() {
+	if (!selected)
+		return getif(next);
+	else {
+		selectedIndex = (selectedIndex + length - 1) % length;
+		return this;
+	}
+}
+
+Menu *MenuList::left() {
+	if (!selected) {
+		return getif(parent);
+	} else {
+		selected = false;
+		return this;
+	}
+}
+
+Menu *MenuList::right() {
+	if (!selected) {
+		selected = true;
+	} else {
+		selectedIndex = (selectedIndex + length - 1) % length;
+	}
+	return this;
+}
+
+Menu *MenuList::back() {
+	selected = false;
+	return getif(last);
+}
+
+const char *MenuList::getValue() {
+	return values[selectedIndex];
+}
+
+void MenuList::setIndex(int index) {
+	selectedIndex = min(length-1, max(0, index));
+}
+
+int MenuList::getIndex() {
+	return selectedIndex;
+}
+
 
 
