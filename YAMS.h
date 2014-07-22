@@ -44,9 +44,9 @@
 
 #define MENU_TIMEOUT 30000
 
-#ifdef __cplusplus
+/*#ifdef __cplusplus
 extern "C" {
-#endif
+#endif */
 
 /* Define a common interface for displays
  * But this sucks because it means we can't use the capabilities of each display
@@ -89,26 +89,46 @@ protected:
 	Menu *getif(Menu *t);
 
 public:
-	// Standard input and output methods
+	// Standard output methods
+	// Use one of these, create a new one (for a new type of display)
+	// Or supply a replacement function to 'display' function pointer
 	virtual void serialDisplay();
 	virtual void LCDdisplay();
 
+	// Standard menu control
+	// Use one of these, create a new one (for a new type of input)
+	// Or supply a replacement function to 'processInput' function pointer
 	virtual Menu *serialProcessInput();
 	virtual Menu *keypadProcInput();
 
+	// Standard serial input method
+	// Use one of these, create a new one (for a new type of character input)
+	// Or supply a replacement function to 'getInput' function pointer
 	virtual const char  serialInput();
 
+  /*
+   * General purpose constructor.
+   * Optionally supply an alternative display function, menu processing function
+   * or
+   */
 	Menu(const char *n,
-		 bool loop,
+		 bool loop = true,
 		 void (*dis)(Menu &m) = NULL,
 		 Menu* (*procin)(Menu &m) = NULL,
 		 const char (*in)(Menu &m) = NULL);
 
+  /*
+   * Constructor to set input and output modes (eg. LCDOUT and KEYIN)
+   * Must call setLCD and setKeypad to initialise, if used
+   */
     Menu(const char *n,
        const bool loop,
        const OutputType out,
        const InputType  in);
 
+  /*
+   * All-in one constructor to use LCD for output and Keypad for input
+   */
     Menu(const char *n,
 		const bool loop,
 		LiquidCrystal &l,
@@ -138,16 +158,18 @@ public:
   void showStructure(bool full);    // Displays the structure of the menu
 };
 
+template <class N>
 class MenuValue : public Menu {
 protected:
-	int value, minv, maxv;
+	N value, minv, maxv, inc;
 	bool selected;  // When MenuValue is selected, up and down adjust value
 
 public:
 	MenuValue(const char *n,
-			  int val,
-			  int lowerbound,
-			  int upperbound,
+			  N val,
+			  N lowerbound,
+			  N upperbound,
+			  N inc,
 				 void (*dis)(Menu &m) = NULL,
 				 Menu* (*procin)(Menu &m) = NULL,
 				 const char (*in)(Menu &m) = NULL);
@@ -155,8 +177,8 @@ public:
 	MenuValue();
 	virtual ~MenuValue();
 
-	int getValue();
-	void setValue(int v);
+	N getValue();
+	void setValue(N v);
 
 	// void serialDisplay();
 	void LCDdisplay();
@@ -208,6 +230,112 @@ public:
 	// Menu *back();
 };
 
+/* class MenuValue : public Menu {
+protected:
+	N value, minv, maxv, inc;
+	bool selected;  // When MenuValue is selected, up and down adjust value */
+template <class N>
+MenuValue<N>::MenuValue(const char *n,
+		  N v,
+		  N lb,
+		  N ub,
+		  N incr,
+		  void (*dis)(Menu &m),
+		  Menu* (*procin)(Menu &m),
+		  const char (*in)(Menu &m)) {
+	name = n;
+	getInput = in;
+	processInput = procin;
+	display = dis;
+	current = this;
+	value = v;
+	minv = lb;
+	maxv = ub;
+	inc = incr;
+	selected = false;
+}
+
+template <class N>
+MenuValue<N>::MenuValue() {
+	name = NULL;
+	getInput = NULL;
+	processInput = NULL;
+	display = NULL;
+	current = this;
+	value = minv = maxv = inc = 0;
+	selected = false;
+}
+
+template <class N>
+MenuValue<N>::~MenuValue() {;}
+
+template <class N>
+void MenuValue<N>::LCDdisplay() {
+	lcd->clear();
+	if (selected) {
+		lcd->print(F("Set ") );
+		lcd->print(name);
+		lcd->print(": ");
+		lcd->print(value, 1);
+	} else {
+		lcd->print(name);
+		lcd->print(" = ");
+		lcd->print(value, 1);
+	}
+	lcd->print("   ");
+}
+
+template <class N>
+Menu *MenuValue<N>::up() {
+	if (!selected)
+		return getif(prev);
+	else {
+		value = min(maxv, value+inc);
+		return this;
+	}
+}
+
+template <class N>
+Menu *MenuValue<N>::down() {
+	if (!selected)
+		return getif(next);
+	else {
+		value = max(minv, value-inc);
+		return this;
+	}
+}
+
+template <class N>
+Menu *MenuValue<N>::left() {
+	if (!selected) {
+		return getif(parent);
+	} else {
+		selected = false;
+		return this;
+	}
+}
+
+template <class N>
+Menu *MenuValue<N>::right() {
+	selected = true;
+	return this;
+}
+
+template <class N>
+Menu *MenuValue<N>::back() {
+	selected = false;
+	return getif(last);
+}
+
+template <class N>
+N MenuValue<N>::getValue() {
+	return value;
+}
+template <class N>
+void MenuValue<N>::setValue(N v) {
+	value = v;
+}
+
 class MenuList : public Menu {
 protected:
 	const char ** values;
@@ -218,8 +346,8 @@ protected:
 public:
 	 MenuList (const char *n,
     		   const char * vs[],
-    		   const int index,
-    			  int len,
+    		   const int len,
+    			  int index,
 				  void (*dis)(Menu &m) = NULL,
 				  Menu* (*procin)(Menu &m) = NULL,
 				  const char (*in)(Menu &m) = NULL);
@@ -248,9 +376,9 @@ public:
 	Menu *back();
 };
 
-
+/*
 #ifdef __cplusplus
 } // extern "C"
-#endif
+#endif */
 
 #endif /* YAMS_H_ */

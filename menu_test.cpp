@@ -5,6 +5,8 @@
 #define BUTTON_ADC_PIN           A0  // A0 is the button ADC input
 #define LCD_BACKLIGHT_PIN         3  // D3 controls LCD backlight
 
+// #define TEST
+
   /*--------------------------------------------------------------------------------------
     Init the LCD library with the LCD pins to be used
   --------------------------------------------------------------------------------------*/
@@ -16,28 +18,12 @@
   // AnalogButtons tkeypad(BUTTON_ADC_PIN, 0, 98, 252, 407, 637);        // Other one
   AnalogButtons tkeypad(BUTTON_ADC_PIN, AnalogButtons::OTHER);        // Other one
 
-  char *topStr = "Top";
-  char *fileStr = "File";
-  char *editStr = "Edit";
-  char *optStr = "Options";
 
-  int m_freeRam () {
-    extern int __heap_start, *__brkval;
-    int v;
-    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
-  }
-
-  void m_showFreeRam() {
-  	Serial.print(m_freeRam(), DEC);
-  	Serial.println(F(" free RAM"));
-  }
-
-
-void lcdkeyMenu() {
-  Menu topMenu(topStr, true, tlcd, tkeypad);
-  Menu fileMenu(fileStr, false);
-  Menu editMenu(editStr, false);
-  Menu optionMenu(optStr, false);
+void localMenu() {
+  Menu topMenu("Top", true, Menu::LCDOUT, Menu::KEYIN);
+  Menu fileMenu("File", false);
+  Menu editMenu("Edit", false);
+  Menu optionMenu("Options", false);
   
   topMenu.addChild(fileMenu).addChild(editMenu).addChild(optionMenu);
   
@@ -58,10 +44,10 @@ void lcdMenu() {
 }
 
 void keypadMenu() {
-  Menu topMenu(topStr, true, Menu::SEROUT, Menu::KEYIN);
-  Menu fileMenu(fileStr, false);
-  Menu editMenu(editStr, false);
-  Menu optionMenu(optStr, false);
+  Menu topMenu("Top", true, Menu::SEROUT, Menu::KEYIN);
+  Menu fileMenu("File", false);
+  Menu editMenu("Edit", false);
+  Menu optionMenu("Options", false);
   
   topMenu.addChild(fileMenu).addChild(editMenu).addChild(optionMenu);
   
@@ -70,56 +56,58 @@ void keypadMenu() {
   topMenu.activate();
 }
 
-char *daySt1 = "Days";
-char *hrStr1 = "Hours";
-char *runStr1 = "Get/Set Runtime";
-char *schedStr1 = "Schedule";
-char *mainStr1 = "Main Menu";
+  float t_schedule[20]      = {19, 19, 19.5, 20, 20, 20.5, 21, 21.5, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23};
 
-float t_schedule[20]      = {19, 19, 19.5, 20, 20, 20.5, 21, 21.5, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23};
+  char *dyStr   = "Days";
+  char *hourStr  = "Hours";
+  char *runtStr  = "Get/Set Run Time";
+  char *schedStr = "Schedule";
+  char *mainStr  = "Main Menu";
 
-  MenuValue *t_runDays      = new MenuValue(daySt1, 0, -5, 30);
-  MenuValue *t_runHours     = new MenuValue(hrStr1, 0, 0, 23);
+  MenuValue<int> *t_runDays;
+  MenuValue<float> *t_runHours;
   
-  // Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
-  // Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);
-  Menu *t_runningTime       = new Menu(runStr1, false);
+  Menu *t_runningTime;
   
-  MenuArray *t_scheduleMenu = new MenuArray(schedStr1, t_schedule);
+  MenuArray *t_scheduleMenu;
   
-  // Menu mm = Menu(mainStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runningTime ).addChild( scheduleMenu );
-  // Menu *mm = new Menu(mainStr, false, &Menu::LCDdisplay, &Menu::keypadProcInput);
-  // Menu *gm = new Menu(mainStr1, false, Menu::LCDOUT, Menu::KEYIN);
-  Menu *gm = new Menu(mainStr1, false, tlcd, tkeypad);
+  Menu *gm;
 
 void globalMenu() {
-  gm->addChild(*t_runningTime);
-  t_runningTime->addSibling(*t_scheduleMenu, false);
-  t_runningTime->addChild(*t_runDays).addChild(*t_runHours);
-  
-  gm->activate();
+	t_runDays      = new MenuValue<int>(dyStr, 0, 0, 20, 1);
+	t_runHours     = new MenuValue<float>(hourStr, 0, 0, 20, 1);
+
+	t_runningTime       = new Menu(runtStr, false);
+
+	t_scheduleMenu = new MenuArray(schedStr, t_schedule, 20);
+
+	gm = new Menu(mainStr, false, tlcd, tkeypad);
+
+	// t_runningTime->addSibling(*t_scheduleMenu, false);
+	t_runningTime->addChild(*t_runDays).addChild(*t_runHours);
+	gm->addChild(*t_runningTime).addChild(*t_scheduleMenu);
+
+	gm->activate();
 }
 
-void localMenu() {
-	  MenuValue t_runDays      = MenuValue("Days", 1, 1, 30);
-	  MenuValue t_runHours     = MenuValue("Hours", 1, 1, 24);
+Menu test, test1, test2;
+MenuValue<int> testInt;
 
-	  // Menu runningTime       = Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput).addChild( runDays ).addChild( runHours );
-	  // Menu *runningTime       = new Menu(runStr, true, &Menu::LCDdisplay, &Menu::keypadProcInput);
-	  Menu t_runningTime       = Menu("Get/Set Runtime", false);
+void localInitMenu() {
+	test = Menu("Hello", true, tlcd, tkeypad);
+	test1 = Menu("Press a key");
+	test2 = Menu("Any key");
 
-	  MenuArray t_scheduleMenu = MenuArray("Schedule", t_schedule);
+	testInt = MenuValue<int>("Value", 4, 1, 10, 2);
 
-	  Menu lm = Menu("Main Menu", false, tlcd, tkeypad);
+	test1.addChild(test2);
+	test.addChild(testInt).addChild(test1);
 
-	  lm.addChild(t_runningTime);
-	  t_runningTime.addSibling(t_scheduleMenu, false);
-	  t_runningTime.addChild(t_runDays).addChild(t_runHours);
-
-	  lm.activate();
+	test.activate();
 }
 
-void m_setup() {
+#ifdef TEST
+void setup() {
 	  Serial.begin(19200);
 	  delay(5000);
 
@@ -131,22 +119,28 @@ void m_setup() {
 	   digitalWrite( LCD_BACKLIGHT_PIN, HIGH );
 
 	   // Serial.println(F("Setup global menu"));
-	   m_showFreeRam();
-
 	   tlcd.setCursor(0, 0);
 	   tlcd.print(F("Testing"));
-	   // globalMenu();
+
+	   delay(2000);
+	   globalMenu();
 }
 
-void m_loop() {
-	m_showFreeRam();
-	/* Serial.println(F("LCD menu"));
+void loop() {
+	gm->activate();
+}
+
+/* void loop() {
+	// localInitMenu();
+	Serial.println(F("LCD menu"));
 	lcdMenu();
 	Serial.println(F("Keypad menu"));
-	keypadMenu(); */
-	/* Serial.println(F("Global menu"));
-	gm->activate(); */
+	keypadMenu();
+	Serial.println(F("Global menu"));
+	gm->activate();
 	Serial.println(F("Local menu"));
 	localMenu();
   
 }
+*/
+#endif

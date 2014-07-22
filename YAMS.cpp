@@ -70,8 +70,8 @@ Menu::Menu(const char *n,
 	getInput = NULL;
 	processInput = NULL;
 	display = NULL;
-	input = in;
-	output = out;
+	if (in) input = in;
+	if (out) output = out;
 	Menu::current = this;
 	parent = child = next = prev = NULL;
 }
@@ -130,7 +130,7 @@ Menu *Menu::back() {
 void Menu::activate() {
 	// Serial.println(freeRam());
 	// showStructure(true);
-	if (output == LCDOUT) {
+	if (output == LCDOUT && lcd) {
 		lcd->clear();
 	}
 	
@@ -139,14 +139,18 @@ void Menu::activate() {
 	if (!current) current = (last ? last : this);
 
 	do {
-		if (output == SEROUT && previous != current) {
+	  if (display) {
+	    display(*current);
+	  } else if (output == SEROUT && previous != current) {
 			current->serialDisplay();
 		} else if (output == LCDOUT) {
 			current->LCDdisplay();
 		}
 		previous = current;
 
-		switch (input) {
+     if (processInput) {
+       current = processInput(*current);
+     } else switch (input) {
 		case SERIN: { current = current->serialProcessInput(); break; }
 		case KEYIN: { current = current->keypadProcInput(); break; }
 		}
@@ -172,9 +176,13 @@ const char Menu::serialInput() {
 	return Serial.read();
 }
 
+/* 
+ * Default serial input processing.
+ * Will use getInput function, if supplied.
+ */
 Menu *Menu::serialProcessInput() {
-	// switch (getInput(*this)) {
-	switch (serialInput()) {
+  char in = (getInput ? getInput(*current) : serialInput());
+	switch (in) {
 	case 'u': return up();
 	case 'd': return down();
 	case 'l': return left();
@@ -198,6 +206,7 @@ Menu *Menu::keypadProcInput() {
 	while (keypad->getButtonJustPressed()) keypad->read();
 	do {
 		// Alarm.delay(0);   // Allow alarm to interrupt to do other tasks
+		// Don't allow alarm to interrupt as it kills responsiveness
 		keypad->read();
 	} while (keypad->getButtonWas() == BUTTON_NONE && !menuTimeout.timeUp());
 
@@ -294,98 +303,6 @@ void Menu::showStructure(bool full) {
   
 }    
 
-// class MenuValue : Menu {
-// protected:
-//	int &value;
-//	bool selected = false;  // When MenuValue is selected, up and down adjust value
-MenuValue::MenuValue(const char *n,
-		  int v,
-		  int lb,
-		  int ub,
-		  void (*dis)(Menu &m),
-		  Menu* (*procin)(Menu &m),
-		  const char (*in)(Menu &m)) {
-	name = n;
-	getInput = in;
-	processInput = procin;
-	display = dis;
-	current = this;
-	value = v;
-	minv = lb;
-	maxv = ub;
-	selected = false;
-}
-
-MenuValue::MenuValue() {
-	name = NULL;
-	getInput = NULL;
-	processInput = NULL;
-	display = NULL;
-	current = this;
-	value = minv = maxv = 0;
-	selected = false;
-}
-
-MenuValue::~MenuValue() {;}
-
-void MenuValue::LCDdisplay() {
-	lcd->clear();
-	if (selected) {
-		lcd->print(F("Set ") );
-		lcd->print(name);
-		lcd->print(": ");
-		lcd->print(value, 1);
-	} else {
-		lcd->print(name);
-		lcd->print(" = ");
-		lcd->print(value, 1);
-	}
-	lcd->print("   ");
-}
-
-Menu *MenuValue::up() {
-	if (!selected)
-		return getif(prev);
-	else {
-		value = min(maxv, value+1);
-		return this;
-	}
-}
-
-Menu *MenuValue::down() {
-	if (!selected)
-		return getif(next);
-	else {
-		value = max(minv, value-1);
-		return this;
-	}
-}
-
-Menu *MenuValue::left() {
-	if (!selected) {
-		return getif(parent);
-	} else {
-		selected = false;
-		return this;
-	}
-}
-
-Menu *MenuValue::right() {
-	selected = true;
-	return this;
-}
-
-Menu *MenuValue::back() {
-	selected = false;
-	return getif(last);
-}
-
-int MenuValue::getValue() {
-	return value;
-}
-void MenuValue::setValue(int v) {
-	value = v;
-}
 
 /* class MenuArray : Menu {
 protected:

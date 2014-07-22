@@ -9,29 +9,22 @@ Button press returns to menu view -- wherever menu was, unless menu was last act
 
 Menu:
 Review
--> Daily review  (replay min/max/set/duty cycle each day, cycle every 3 sec, disable time-out)
+-> Daily review  (replay min/max/duty cycle each day, cycle every 3 sec, disable time-out)
 -> Hourly review (replay min/max/duty cycle each hour, cycle every 2 sec, disable time-out)
 Appliance  Heater/Cooler
-Mode       Set point/Preset Schedule (Lager, Cider, ??)
+Preset Schedule (Lager, Cider, Manual)
 Configure
--->Adjust setpoint
--->Adjust schedule offset
+-->Adjust start point/set point
+-->Adjust end point
+-->Adjust duration
 -->Running time
   -> Days  +/-
   -> Hours +/-
-  Schedule
-  -> Day 0 +/-
-  etc
 
 While running, record history of temperatures, min and max per hour
 
-
-. Menu to set mode: heating/cooling
-. Alarm if cooling when needs to heat, or vice versa
 . Alarm if unable to reach set point
 . Check for crazy set points 0 < T < 30
-. Record history of temperatures, per hour
-. Menu option to show temperature history
 */
 
 /*--------------------------------------------------------------------------------------
@@ -39,7 +32,6 @@ While running, record history of temperatures, min and max per hour
 --------------------------------------------------------------------------------------*/
 #include "Time_Temp_Menu_Controller.h"
 #include <OneWire.h>
-#include <Wire.h>
 #include <LiquidCrystal.h>   // include LCD library
 #include <Time.h>
 #include "Timer.h"
@@ -56,14 +48,14 @@ While running, record history of temperatures, min and max per hour
 #define BUZZER_PIN                11 // Piezo buzzer
 
 #define AVERAGE_WEIGHT            0.05 // For use when calculating moving average
-#define RESWITCH_TIME             120  // 120s Minimum time between power cycling (10 for testing)
+#define RESWITCH_TIME             10  // 120s Minimum time between power cycling (10 for testing)
 // Error codes
 #define NO_SENSOR                 1    // No or unexpected 1-wire temperature sensor connected
 #define SETPOINT_TOO_HIGH_LOW     2    // Can't reach setpoint. Too high (heating) or low (cooling).
 #define WRONG_MODE                3    // Mode is set to heating (cooling) but should be cooling (heating)
 #define WRONG_APPLIANCE           4    // Mode is set to heating (cooling) but attached appliance cools (heats)
 
-#define NO_ALARMS                 false   // To turn off all warning alarms
+#define NO_ALARMS                 true   // To turn off all warning alarms
 #define MENU_TIMEOUT              5000    // ms of inactivity before menu mode will be replaced by normal running
 #define REDRAW_PERIOD             950    // How often to read temp and display values
 
@@ -84,7 +76,6 @@ float setPoint          = 21.5;            // set point temp in degrees C
 boolean recentlySwitched= false;
 boolean applianceOn     = false;
 
-boolean showSmoothed    = true;
 float schedule[20]      = {19, 19, 19.5, 20, 20, 20.5, 21, 21.5, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23};
 
 float hourlyMax[24]     = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -115,32 +106,27 @@ const char *heatStr = "Heating";
 const char *coolStr = "Cooling";
 const char *applianceMode[] = {heatStr, coolStr};
 
-MenuList *appMode = new MenuList("Appliance", applianceMode, 2, 1);
+const char *controlMode[] = {"Lager", "Cider", "Manual"};
+
+MenuList *appMode, *contMode;
 
 // By default, value enters a submenu to increment/decrement the value, on select
-MenuValue *runDays      = new MenuValue("Days", 1, 1, 20);
-MenuValue *runHours     = new MenuValue("Hours", 1, 1, 24);
+MenuValue<int> *runDays, *runHours, *duration;
 
-Menu *runningTime       = new Menu("Get/Set Runtime", true);
+Menu *runningTime, *config, *mm;
 
-MenuArray *scheduleMenu = new MenuArray("Schedule", schedule, 20);
+MenuValue<float> *startPoint, *endPoint;
 
-Menu *mm = new Menu("Main Menu", false, lcd, keypad);
-
-/*    MenuItem review         = MenuItem(menu, "Review", 2);
-      MenuItem dailyReview  = MenuItem(menu, "DailyReview", 3);
-      MenuItem hourlyReview = MenuItem(menu, "HourlyReview", 3);
-
-    review.addRight(MenuList({dailyReview, hourlyReview});
-
-    menu.getRoot().addRight( MenuList({runningTime, schedule, review}) );
-*/
+Menu *review, *dailyReviewM, *hourlyReviewM;
 
 // Forward declarations
+void menuSetup();
 void normalDisplay();
 void updateTemp();
 void every5s();
 void onTheHour();
+void dailyReview( Menu &m );
+void hourlyReview( Menu &m );
 
 /*--------------------------------------------------------------------------------------
   setup()
@@ -171,32 +157,7 @@ void setup(void) {
    //set up the LCD number of columns and rows: 
    lcd.begin( 16, 2 );
 
-   // Menu setup
-    /*
-    Menu:
-    Review
-    -> Daily review  (replay min/max/set/duty cycle each day, cycle every 3 sec, disable time-out)
-    -> Hourly review (replay min/max/duty cycle each hour, cycle every 2 sec, disable time-out)
-    Appliance  Heater/Cooler
-    Mode       Set point/Preset Schedule (Lager, Cider, ??)
-    Configure
-    -->Adjust setpoint
-    -->Adjust schedule offset
-    -->Running time
-      -> Days  +/-
-      -> Hours +/-
-      Schedule
-      -> Day 0 +/-
-      etc
-    */
-
    Alarm.delay(2000);
-
-   runningTime->addChild( *runDays ).addChild( *runHours );
-   mm->addChild( *appMode ).addChild( *runningTime ).addChild( *scheduleMenu );
-
-   mm->setLCD(lcd);
-   mm->setKeypad(keypad);
 
    lcd.setCursor(0, 0);
    if (coolingMode) {           // cooling Mode
@@ -209,7 +170,90 @@ void setup(void) {
 
    Alarm.delay(2000);
 
+   menuSetup();
+
    normalDisplay();
+}
+
+// Menu setup
+ /*
+ Menu:
+ Review
+ -> Daily review  (replay min/max/duty cycle each day, cycle every 3 sec, disable time-out)
+ -> Hourly review (replay min/max/duty cycle each hour, cycle every 2 sec, disable time-out)
+ Appliance  Heater/Cooler
+ Mode       Set point/Preset Schedule (Lager, Cider, ??)
+ Configure
+ -->Adjust setpoint
+ -->Adjust schedule offset
+ -->Running time
+   -> Days  +/-
+   -> Hours +/-
+   Schedule
+   -> Day 0 +/-
+   etc
+ */
+void menuSetup() {
+	appMode = new MenuList("Appliance", applianceMode, 2, 1);
+
+	contMode = new MenuList("Preset", controlMode, 3, 1);
+
+	// By default, value enters a submenu to increment/decrement the value, on select
+	runDays      = new MenuValue<int>("Days", 1, 1, 20, 1);
+	runHours     = new MenuValue<int>("Hours", 1, 1, 24, 1);
+
+	runningTime       = new Menu("Get/Set Runtime", true);
+
+	// MenuArray *scheduleMenu = new MenuArray("Schedule", schedule, 20);
+	config       = new Menu("Configure", true);
+
+	startPoint   = new MenuValue<float>("T start", 18.0, 4.0, 35.0, 0.5);
+	endPoint     = new MenuValue<float>("T final", 22.0, 4.0, 35.0, 0.5);
+	duration     = new MenuValue<int>("Duration", 20, 5, 30, 1);
+
+	review         = new Menu("Review", true);
+	dailyReviewM  = new Menu("DailyReview", false, dailyReview);
+	hourlyReviewM = new Menu("HourlyReview", false, hourlyReview);
+
+	review->addChild(*hourlyReviewM).addChild(*dailyReviewM);
+
+	mm = new Menu("Main Menu", false, lcd, keypad);
+
+	runningTime->addChild( *runDays ).addChild( *runHours );
+
+	config->addChild(*startPoint).addChild(*endPoint).addChild(*duration).addChild( *runningTime );
+	// config->addChild(*duration).addChild( *runningTime );
+
+	mm->addChild( *review ).addChild( *appMode ).addChild( *contMode ).addChild( *config );
+}
+
+
+void arrayReplay( float data1[], float data2[], int len, int del ) {
+  lcd.clear();
+  for (int i=0; i<len; i++) {
+    lcd.setCursor( 0, 0 );   //top left
+    lcd.print("Min ");
+    lcd.print(i);
+    lcd.print("=");
+    lcd.print(data1[i], 1);
+    
+    lcd.setCursor( 0, 1 );   //bottom left
+    lcd.print("Max ");
+    lcd.print(i);
+    lcd.print("=");
+    lcd.print(data2[i], 1);
+
+    delay(del);
+  }
+}
+
+void hourlyReview(Menu &m) {
+  arrayReplay( hourlyMin, hourlyMax, 24, 3000 );
+}
+
+
+void dailyReview(Menu &m) {
+  arrayReplay( dailyMin, dailyMax, 24, 3000 );
 }
 
 void alarm(int alarmType) {
@@ -427,19 +471,30 @@ void updateTemp() {
 
 void every5s() {
 	Serial.println(F("5s"));
-   setPoint = schedule[runDays->getValue() - 1];
+   // setPoint = schedule[runDays->getValue() - 1];
+   // float completeness = (runDays->getValue() - 1 + ((second()/60.0 + minute())/60.0 + runHours->getValue() - 1)/24.0) / duration->getValue();
+
+	// Accurate temperature -- to the hour
+	float completeness = (runDays->getValue() - 1 + (runHours->getValue() - 1)/24.0) / duration->getValue();
+   setPoint = startPoint->getValue() + (endPoint->getValue() - startPoint->getValue())*min(1.0, max( 0.0, completeness ));
 
    hourlyPower += (applianceOn ? 5.0 : 0.0);
 
-   int hours = runHours->getValue();
+   /* Serial.print(completeness, 2);
+   Serial.print(" comp, set ");
+   Serial.print(setPoint, 3);
+   Serial.print(" pow ");
+   Serial.println(hourlyPower); */
+
+   int hours = runHours->getValue() - 1;
    hourlyMax[hours] = max(hourlyMax[hours], smoothedTemp);
    hourlyMin[hours] = min(hourlyMin[hours], smoothedTemp);
 }
 
 void onTheHour() {
 	Serial.println(F("on the hour"));
-	int hours = runHours->getValue();
-	int days  = runDays->getValue();
+	int hours = runHours->getValue() - 1;
+	int days  = runDays->getValue() - 1;
 
 	dailyMax[days]   = max(dailyMax[days], hourlyMax[hours]);
 	dailyMin[days]   = min(dailyMin[days], hourlyMin[hours]);
