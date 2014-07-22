@@ -139,22 +139,23 @@ void Menu::activate() {
 	if (!current) current = (last ? last : this);
 
 	do {
-	  if (current->display) {
-	    current->display(*current);
-	  } else if (output == SEROUT && previous != current) {
+		if (current->display) {
+			current->display(*current);
+		} else if (output == SEROUT && previous != current) {
 			current->serialDisplay();
 		} else if (output == LCDOUT) {
 			current->LCDdisplay();
 		}
 		previous = current;
 
-     if (current->processInput) {
-       current = current->processInput(*current);
-     } else switch (input) {
-		case SERIN: { current = current->serialProcessInput(); break; }
-		case KEYIN: { current = current->keypadProcInput(); break; }
+		if (current->processInput) {
+			current = current->processInput(*current);
+		} else switch (input) {
+			case SERIN: { current = current->serialProcessInput(); break; }
+			case KEYIN: { current = current->keypadProcInput(); break; }
 		}
-		if (previous != current) current->onExit();
+		// If we leave this menu, call onExit on previous menu
+		if (previous != current) previous->onExit();
 		
 	} while (current);   // NULL from process input means exit menu
 
